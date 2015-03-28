@@ -22,3 +22,60 @@
   ($count [this]
     "Show the number of non-nil values in each column")
   ($describe [this]))
+
+(deftype DataFrame [data-array-map]
+  ;; A data table.  The core data structure is an array-map where
+  ;; the keys are column names and the values are vectors of
+  ;; column data.
+  
+  Tabular
+  
+  ($col [this col] (if (sequential? col)
+                     ;; if > 1 column names passed, return DataFrame
+                     ($ this col nil)
+                     ;; if 1 column name passed, return vector
+                     (data-array-map col)))
+  
+  ($row [this row] ($ this nil (if (sequential? row)
+                                 row
+                                 [row])))
+  
+  ($ [this cols rows]
+    (let [cols (if (nil? cols)
+                 ($colnames this)
+                 cols)]
+      (new DataFrame
+           (apply array-map
+                  (interleave cols
+                              (mapv (fn [col] (if (nil? rows)
+                                                ($col this col)
+                                                (mapv ($col this col) rows)))
+                                    cols))))))
+  
+  ($nrow [this]
+    (count (data-array-map (first (keys data-array-map)))))
+  
+  ($ncol [this]
+    (count (keys data-array-map)))
+  
+  ($colnames [this]
+    (keys data-array-map))
+  
+  ($map [this src-col f]
+    (mapv f (data-array-map src-col)))
+  ($map [this src-col f dst-col]
+    (new DataFrame (assoc data-array-map
+                          dst-col
+                          (mapv f ($col this src-col)))))
+  ($describe [this]
+    (println (type data-array-map))
+    (map #(println (type ($col this %))) ($colnames this)))
+
+  ($count [this]
+    (mapv (fn [col]
+            (count (filter (fn [x] (not (nil? x)))
+                           ($col this col))))
+          ($colnames this)))
+  
+  Object
+  (toString [this] (clojure.pprint/pprint data-array-map)))
