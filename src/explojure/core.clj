@@ -79,3 +79,25 @@
   
   Object
   (toString [this] (clojure.pprint/pprint data-array-map)))
+
+(defn $df
+  "
+  Create a new DataFrame. For now, assumes that:
+   - all vectors are of same length
+
+  Arguments are alternating key value expressions such as one would
+  supply to the hash-map or array-map functions.  Keys are column
+  names, and values are sequentials (vectors, lists, etc.) containing
+  the data for each column.
+
+  Data vector should be the same length.
+  "
+  [& keyvals]
+  (loop [d (array-map)
+         remaining (reverse keyvals)]
+    (if (seq remaining)
+      (let [current (reverse (take 2 remaining))
+            column (first current)
+            data (second current)]
+        (recur (assoc d column (vec data)) (drop 2 remaining)))
+      (new DataFrame d))))
