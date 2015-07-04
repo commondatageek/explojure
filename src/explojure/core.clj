@@ -101,3 +101,5 @@
             data (second current)]
         (recur (assoc d column (vec data)) (drop 2 remaining)))
       (new DataFrame d))))
+
+
