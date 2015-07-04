@@ -1,5 +1,13 @@
 (ns explojure.core)
 
+(defn unwoven-array-map
+  [keys values]
+  (apply array-map (interleave keys values)))
+
+(defn $df
+  "Placeholder to allow compilation."
+  [& keyvals])
+
 (defprotocol Tabular
   "
   The Tabular protocol represents tabular data.  (Rows and columns).
@@ -21,7 +29,10 @@
   given, return this Tabular with a new column.")
   ($count [this]
     "Show the number of non-nil values in each column")
-  ($describe [this]))
+  ($describe [this])
+  ($conj-rows [this d2]
+    "Join two Tabulars along the row axis"))
+
 
 (deftype DataFrame [data-array-map]
   ;; A data table.  The core data structure is an array-map where
@@ -44,13 +55,12 @@
     (let [cols (if (nil? cols)
                  ($colnames this)
                  cols)]
-      (new DataFrame
-           (apply array-map
-                  (interleave cols
-                              (mapv (fn [col] (if (nil? rows)
-                                                ($col this col)
-                                                (mapv ($col this col) rows)))
-                                    cols))))))
+      (apply $df
+             (interleave cols
+                         (mapv (fn [col] (if (nil? rows)
+                                           ($col this col)
+                                           (mapv ($col this col) rows)))
+                               cols)))))
   
   ($nrow [this]
     (count (data-array-map (first (keys data-array-map)))))
@@ -76,6 +86,18 @@
             (count (filter (fn [x] (not (nil? x)))
                            ($col this col))))
           ($colnames this)))
+
+  ($conj-rows [this d2]
+    (if (not d2)
+      this
+      (let [this-cols ($colnames this)
+            d2-cols ($colnames d2)
+            unique-cols (keys (unwoven-array-map (concat this-cols d2-cols)
+                                                 (repeat 1)))]
+        (apply $df
+               (unwoven-array-map unique-cols
+                                  (map #(concat ($col this %) ($col d2 %))
+                                       unique-cols))))))
   
   Object
   (toString [this] (clojure.pprint/pprint data-array-map)))
