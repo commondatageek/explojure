@@ -29,6 +29,9 @@
   ;; column data.
   
   Tabular
+  clojure.lang.IFn
+
+  (invoke [this cols rows] ($ this cols rows))
   
   ($col [this col] (if (sequential? col)
                      ;; if > 1 column names passed, return DataFrame
