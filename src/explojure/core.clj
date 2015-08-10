@@ -30,6 +30,8 @@
   ($count [this]
     "Show the number of non-nil values in each column")
   ($describe [this])
+  ($add-col [this col name]
+    "Add a column to the dataframe")
   ($conj-rows [this d2]
     "Join two Tabulars along the row axis"))
 
@@ -83,6 +85,9 @@
   ($describe [this]
     (println (type data-array-map))
     (map #(println (type ($col this %))) ($colnames this)))
+
+  ($add-col [this col name]
+            (assoc data-array-map name col))
 
   ($count [this]
     (mapv (fn [col]
