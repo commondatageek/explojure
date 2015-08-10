@@ -13,6 +13,16 @@
                     [[] (hash-set)]
                     xs)))
 
+(defn rename-keys [m rename]
+  (reduce (fn [updated k]
+            (let [repl-k (get rename k)
+                  v (get updated k)]
+              (if (nil? v)
+                updated
+                (dissoc (assoc updated repl-k v) k))))
+          m
+          (keys rename)))
+
 
 (defn $df
   "Placeholder to allow compilation."
@@ -45,7 +55,9 @@
   ($conj-rows [this d2]
               "Join two Tabulars along the row axis")
   ($conj-cols [this d2]
-              "Join two Tabulars along the column axis"))
+              "Join two Tabulars along the column axis")
+  ($rename-cols [this repl-map])
+  ($remove-cols [this cols]))
 
 
 (deftype DataFrame [columns data-hash]
@@ -146,6 +158,19 @@
                               raw)))
                 this
                 ($colnames d2)))))
+
+  ($rename-cols [this repl-map]
+    (new DataFrame (replace repl-map columns)
+         (rename-keys data-hash
+                      repl-map)))
+
+  ($remove-cols [this cols]
+    (new DataFrame
+         (remove #(contains? (set cols) %)
+                 columns)
+         (reduce (fn [m c] (dissoc data-hash c))
+                 data-hash
+                 cols)))
   
   
 
@@ -172,3 +197,7 @@
     (new DataFrame
          columns
          (apply hash-map keyvals))))
+
+(comment (reduce (fn [d [column data]]
+          (assoc d column data))
+        (reverse keyvals)))
