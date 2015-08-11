@@ -4,6 +4,16 @@
   [keys values]
   (apply array-map (interleave keys values)))
 
+(defn unique [xs]
+  (first (reduce (fn [a b]
+                      (let [[ord unq] a]
+                        (if (contains? unq b)
+                          [ord unq]
+                          [(conj ord b) (conj unq b)])))
+                    [[] (hash-set)]
+                    xs)))
+
+
 (defn $df
   "Placeholder to allow compilation."
   [& keyvals])
@@ -36,7 +46,7 @@
     "Join two Tabulars along the row axis"))
 
 
-(deftype DataFrame [data-array-map]
+(deftype DataFrame [columns data-hash]
   ;; A data table.  The core data structure is an array-map where
   ;; the keys are column names and the values are vectors of
   ;; column data.
@@ -44,50 +54,59 @@
   Tabular
   clojure.lang.IFn
 
-  (invoke [this cols rows] ($ this cols rows))
+  (invoke [this cols rows]
+          ($ this cols rows))
   
-  ($col [this col] (if (sequential? col)
-                     ;; if > 1 column names passed, return DataFrame
-                     ($ this col nil)
-                     ;; if 1 column name passed, return vector
-                     (data-array-map col)))
+  ($col [this col]
+        (if (sequential? col)
+          ;; if > 1 column names passed, return DataFrame
+          ($ this col nil)
+          ;; if 1 column name passed, return vector
+          (data-hash col)))
   
-  ($row [this row] ($ this nil (if (sequential? row)
-                                 row
-                                 [row])))
+  ($row [this row]
+        ($ this nil (if (sequential? row)
+                      row
+                      [row])))
   
   ($ [this cols rows]
-    (let [cols (if (nil? cols)
-                 ($colnames this)
-                 cols)]
-      (apply $df
-             (interleave cols
-                         (mapv (fn [col] (if (nil? rows)
-                                           ($col this col)
-                                           (mapv ($col this col) rows)))
-                               cols)))))
+     (let [cols (if (nil? cols)
+                  ($colnames this)
+                  cols)]
+       (apply $df
+              (interleave cols
+                          (mapv (fn [col] (if (nil? rows)
+                                            ($col this col)
+                                            (mapv ($col this col) rows)))
+                                cols)))))
   
   ($nrow [this]
-    (count (data-array-map (first (keys data-array-map)))))
+         (count (data-hash (first (keys data-hash)))))
   
   ($ncol [this]
-    (count (keys data-array-map)))
+         (count columns))
   
   ($colnames [this]
-    (keys data-array-map))
+             columns)
   
   ($map [this src-col f]
-    (mapv f (data-array-map src-col)))
+    (mapv f (data-hash src-col)))
   ($map [this src-col f dst-col]
-    (new DataFrame (assoc data-array-map
-                          dst-col
-                          (mapv f ($col this src-col)))))
+        (new DataFrame
+             (conj columns dst-col)
+             (assoc data-hash
+                    dst-col
+                    (mapv f (data-hash src-col)))))
+  
   ($describe [this]
-    (println (type data-array-map))
-    (map #(println (type ($col this %))) ($colnames this)))
-
-  ($add-col [this col name]
-            (assoc data-array-map name col))
+             (map #(println (str % ": "
+                                 (type ($col this %))))
+                  ($colnames this)))
+  
+  ($add-col [this name col]
+            (new DataFrame
+                 (conj columns name)
+                 (assoc data-hash name col)))
 
   ($count [this]
     (mapv (fn [col]
@@ -96,25 +115,35 @@
           ($colnames this)))
 
   ($conj-rows [this d2]
-    (if (not d2)
+    (if (nil? d2)
       this
       (let [this-cols ($colnames this)
             d2-cols ($colnames d2)
-            unique-cols (keys (unwoven-array-map (concat this-cols d2-cols)
-                                                 (repeat 1)))]
+            unique-cols (unique (concat this-cols d2-cols))]
         (apply $df
-               (unwoven-array-map unique-cols
-                                  (map #(concat ($col this %) ($col d2 %))
-                                       unique-cols))))))
+               (interleave unique-cols
+                           (map (fn [x]
+                                  (let [this-vals ($col this x)
+                                        d2-vals ($col d2 x)]
+                                    (concat (if (nil? this-vals)
+                                              (repeat ($nrow d2) nil)
+                                              this-vals)
+                                            (if (nil? d2-vals)
+                                              (repeat ($nrow this) nil)
+                                              d2-vals))))
+                                  unique-cols))))))
   
+  
+
   Object
-  (toString [this] (clojure.pprint/pprint data-array-map)))
+  (toString [this] (clojure.pprint/pprint data-hash)))
+
 
 (defn $df
   "
   Create a new DataFrame. For now, assumes that:
    - all vectors are of same length
-
+  
   Arguments are alternating key value expressions such as one would
   supply to the hash-map or array-map functions.  Keys are column
   names, and values are sequentials (vectors, lists, etc.) containing
@@ -123,13 +152,9 @@
   Data vector should be the same length.
   "
   [& keyvals]
-  (loop [d (array-map)
-         remaining (reverse keyvals)]
-    (if (seq remaining)
-      (let [current (reverse (take 2 remaining))
-            column (first current)
-            data (second current)]
-        (recur (assoc d column (vec data)) (drop 2 remaining)))
-      (new DataFrame d))))
-
-
+  (let [idx (range (count keyvals))
+        columns (mapv (vec keyvals)
+                     (filter even? idx))]
+    (new DataFrame
+         columns
+         (apply hash-map keyvals))))
