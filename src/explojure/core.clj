@@ -43,7 +43,9 @@
   ($add-col [this col name]
     "Add a column to the dataframe")
   ($conj-rows [this d2]
-    "Join two Tabulars along the row axis"))
+              "Join two Tabulars along the row axis")
+  ($conj-cols [this d2]
+              "Join two Tabulars along the column axis"))
 
 
 (deftype DataFrame [columns data-hash]
@@ -115,7 +117,7 @@
           ($colnames this)))
 
   ($conj-rows [this d2]
-    (if (nil? d2)
+     (if (nil? d2)
       this
       (let [this-cols ($colnames this)
             d2-cols ($colnames d2)
@@ -131,7 +133,19 @@
                                             (if (nil? d2-vals)
                                               (repeat ($nrow this) nil)
                                               d2-vals))))
-                                  unique-cols))))))
+                                unique-cols))))))
+
+  ($conj-cols [this d2]
+    (if (nil? d2)
+      this
+      (let [d2-cols ($colnames d2)]
+        (reduce (fn [new-df col]
+                  (let [raw ($col d2 col)]
+                    ($add-col new-df
+                              col
+                              raw)))
+                this
+                ($colnames d2)))))
   
   
 
