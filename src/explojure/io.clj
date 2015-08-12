@@ -34,17 +34,37 @@
                     (map read-long)
                     (map read-double)))
 
-(defn read-csv [f]
-  ;; for now, assuming at least that each CSV file has a header row
-  (with-open [reader (io/reader f)]
-    (let [rows (doall (csv/read-csv reader))
-          header (first rows)
-          data (util/t (map #(sequence types-xf %) (next rows)))]
-      (core/->DataFrame header
-                        (apply hash-map (interleave header data))))))
-
 (defn write-csv [df f]
   (with-open [writer (io/writer f)]
     (let [header (core/$colnames df)
           rows (util/t (map #(core/$col df %) header))]
       (csv/write-csv writer (concat [header] rows)))))
+
+
+
+(defn read-csv [f]
+  ;; for now, assuming at least that each CSV file has a header row
+  (with-open [reader (io/reader f)]
+    (let [csv-seq (csv/read-csv reader)
+          headers (first csv-seq)
+          rows (rest csv-seq)
+          col-ct (count headers)
+          cols (vec (repeatedly col-ct #(vector)))]
+      (loop [cols cols
+           rows rows]
+        (if (seq rows)
+          (recur (loop [cols cols
+                        i 0
+                        row-vals (sequence types-xf (first rows))]
+                   (if (seq row-vals)
+                     (let [col-vals (get cols i)]
+                       (recur (assoc cols i (conj col-vals (first row-vals)))
+                              (inc i)
+                              (rest row-vals)))
+                     cols))
+                 (rest rows))
+          (core/->DataFrame headers
+                            (apply hash-map (interleave headers cols))))))))
+
+
+
