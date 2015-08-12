@@ -59,7 +59,9 @@
   ($conj-cols [this d2]
               "Join two Tabulars along the column axis")
   ($rename-cols [this repl-map])
-  ($remove-cols [this cols]))
+  ($remove-cols [this cols])
+  ($raw [this]
+        "Return the raw data structures underlying this DataFrame"))
 
 (deftype DataFrame [columns data-hash]
   ;; A data table.  The core data structure is an array-map where
@@ -180,6 +182,9 @@
          (reduce (fn [m c] (dissoc data-hash c))
                  data-hash
                  cols)))
+
+  ($raw [this]
+        [columns data-hash])
   
   
 
