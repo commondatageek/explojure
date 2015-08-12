@@ -6,10 +6,11 @@
            [clojure.java.io :as io]))
 
 (def empty-string "")
+(def null-vals (set [empty-string "na" "nan" "null" "nil"]))
 
 (defn read-nil [x]
   (if (string? x)
-    (if (= x empty-string)
+    (if (contains? null-vals (clojure.string/lower-case x))
       nil
       x)
     x))
@@ -37,7 +38,8 @@
       x)
     x))
 
-(def types-xf (comp (map read-nil)
+(def types-xf (comp (map clojure.string/trim)
+                    (map read-nil)
                     (map read-long)
                     (map read-double)
                     (map read-keyword)))
