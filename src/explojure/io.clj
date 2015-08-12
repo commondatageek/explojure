@@ -30,9 +30,17 @@
         x))
     x))
 
+(defn read-keyword [x]
+  (if (string? x)
+    (if (= ":" (subs x 0 1))
+      (keyword (subs x 1))
+      x)
+    x))
+
 (def types-xf (comp (map read-nil)
                     (map read-long)
-                    (map read-double)))
+                    (map read-double)
+                    (map read-keyword)))
 
 (defn write-csv [df f]
   (with-open [writer (io/writer f)]
