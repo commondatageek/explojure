@@ -45,7 +45,7 @@
 (defn write-csv [df f]
   (with-open [writer (io/writer f)]
     (let [header (core/$colnames df)
-          rows (util/t (map #(core/$col df %) header))]
+          rows (core/$rows df)]
       (csv/write-csv writer (concat [header] rows)))))
 
 
