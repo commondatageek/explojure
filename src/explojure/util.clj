@@ -288,7 +288,7 @@
 (defn dir
   "Find all descendents of path with one or more optional filter functions."
   [path & filters]
-  (apply util.core/multi-filter
+  (apply multi-filter
          (concat [(let [path-file (io/as-file path)]
                     (for [f (file-seq path-file)]
                       (.getPath f)))]
