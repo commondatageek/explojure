@@ -1,4 +1,5 @@
-(ns explojure.print)
+(ns explojure.print
+  (require [explojure.core :as core]))
 
 (defn sp [x] (str " " x " "))
 (defn qu [x] (str "\"" x "\""))
@@ -30,4 +31,31 @@
         str-repr
         (str (subs str-repr 0 (- width 1)) ">"))
       (str (apply str (repeat pad-len " ")) str-repr))))
+
+(defn col-dividers [xs] (str "| "  (apply str (interpose " | " xs)) " |"))
+
+(defn print-df [df]
+  (let [[columns data-hash] (core/$raw df)
+        new-df (core/->DataFrame columns
+                                 (reduce (fn [dh c]
+                                           (let [old-col (vec (concat [c] (get dh c)))
+                                                 new-col (map #(ensure-width
+                                                                (min (max-width old-col)
+                                                                     30)
+                                                                %)
+                                                              old-col)]
+                                             (assoc dh c new-col)))
+                                         data-hash
+                                         columns))
+        rows (core/$rows new-df)]
+    (let [headers (first rows)
+          data-rows (rest rows)
+          header-line (col-dividers headers)]
+      ;; print the header line and dividers
+      (println (apply str (repeat (count header-line) "-")))
+      (println header-line)
+      (println (apply str (repeat (count header-line) "-")))
+      (doseq [r data-rows]
+        (println (col-dividers r)))
+      (println (apply str (repeat (count header-line) "-"))))))
 
