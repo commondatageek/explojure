@@ -197,7 +197,3 @@
     (new DataFrame
          columns
          (apply hash-map keyvals))))
-
-(comment (reduce (fn [d [column data]]
-          (assoc d column data))
-        (reverse keyvals)))
