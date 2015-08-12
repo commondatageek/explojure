@@ -35,7 +35,9 @@
   ($col [this col]
     "Return the specified column(s)")
   ($row [this row]
-    "Return the specified row(s)")
+        "Return the specified row(s)")
+  ($rows [this]
+         "Return a lazy sequence of row vectors ")
   ($ [this cols rows]
     "Select the specified columns and rows from this")
   ($nrow [this]
@@ -59,7 +61,6 @@
   ($rename-cols [this repl-map])
   ($remove-cols [this cols]))
 
-
 (deftype DataFrame [columns data-hash]
   ;; A data table.  The core data structure is an array-map where
   ;; the keys are column names and the values are vectors of
@@ -82,6 +83,14 @@
         ($ this nil (if (sequential? row)
                       row
                       [row])))
+
+  ($rows [this]
+         (let [rcr-fn (fn row-fn [ordered-lazy]
+                        (if (seq (first ordered-lazy))
+                          (cons (vec (for [c ordered-lazy] (first c)))
+                                (lazy-seq (row-fn (vec (for [c ordered-lazy] (rest c))))))))]
+           (rcr-fn (for [c (map data-hash columns)]
+                     (lazy-seq c)))))
   
   ($ [this cols rows]
      (let [cols (if (nil? cols)
