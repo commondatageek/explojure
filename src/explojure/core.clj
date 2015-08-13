@@ -189,7 +189,7 @@
   
 
   Object
-  (toString [this] (clojure.pprint/pprint data-hash)))
+  (toString [this] (str "<DataFrame: " ($nrow this) "R, " ($ncol this) "C>")))
 
 
 (defn $df
