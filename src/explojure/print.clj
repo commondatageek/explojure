@@ -19,7 +19,7 @@
         pad-len (max 0 (- width qu-len))]
     (if (= pad-len 0)
       (if (= qu-len width)
-        x
+        (qu x)
         (qu (str (subs x 0 (- width 3)) ">")))
       (str (qu x) (apply str (repeat pad-len " "))))))
 (defmethod ensure-width false [width x]
@@ -32,9 +32,11 @@
         (str (subs str-repr 0 (- width 1)) ">"))
       (str (apply str (repeat pad-len " ")) str-repr))))
 
-(defn col-dividers [xs] (str "| "  (apply str (interpose " | " xs)) " |"))
+;; put | dividers between column values
+(defn col-dividers [xs] (str "| "  (apply str (interpose " | " xs)) " |\n"))
 
-(defn print-df [df]
+;; here's the magic to converta dataframe to textual format
+(defn df->str [df]
   (let [[columns data-hash] (core/$raw df)
         new-df (core/->DataFrame columns
                                  (reduce (fn [dh c]
@@ -52,10 +54,17 @@
           data-rows (rest rows)
           header-line (col-dividers headers)]
       ;; print the header line and dividers
-      (println (apply str (repeat (count header-line) "-")))
-      (println header-line)
-      (println (apply str (repeat (count header-line) "-")))
-      (doseq [r data-rows]
-        (println (col-dividers r)))
-      (println (apply str (repeat (count header-line) "-"))))))
+      (apply str (concat [(str (apply str (repeat (- (count header-line) 1) "-")) "\n")
+                          header-line
+                          (str (apply str (repeat (- (count header-line) 1) "-")) "\n")]
+                         (for [r data-rows]
+                           (col-dividers r))
+                         [(str (apply str (repeat (- (count header-line) 1) "-")) "\n")])))))
+
+;; to make DataFrames display correctly at the REPL
+(defmethod print-method explojure.core.DataFrame [x ^java.io.Writer w]
+  (.write w (df->str x)))
+
+;; print a dataframe
+(defn print-df [df] (print df))
 
