@@ -1,6 +1,6 @@
 (ns explojure.join
-  (:require [clojure.set :as set])
-  (:require [explojure.core :as core]))
+  (:require [explojure.core :as core]
+            [clojure.set :as set]))
 
 (defn gen-index [& cols]
   (reduce (fn [index entry]
@@ -105,13 +105,23 @@
          common-join-cols (set/intersection (set left-on) (set right-on))
 
          ;; get the appropriate rows from each DF
-         le-rows (empty-df left-cols (count right-only))
-         lo-rows (core/$ left left-cols left-only)
-         li-rows (core/$ left left-cols left-inner)
-
+         ri-rows (core/$ right right-cols right-inner)
          re-rows (empty-df right-cols (count left-only))
          ro-rows (core/$ right right-cols right-only)
-         ri-rows (core/$ right right-cols right-inner)
+
+         li-rows (core/$ left left-cols left-inner)
+         lo-rows (core/$ left left-cols left-only)
+
+         ;; left-empty frame is special because we need to
+         ;; grab the keys from the corresponding right-only
+         ;; data frame
+         le-rows (core/$conj-cols (-> ro-rows
+                                      (core/$col right-on)
+                                      (core/$rename-cols (zipmap right-on left-on)))
+                                  (empty-df (remove #(contains? (set left-on) %)
+                                                    left-cols)
+                                            (count right-only)))
+
 
          ;; combine the rows for each side
          left-side (reduce core/$conj-rows [li-rows lo-rows le-rows])
@@ -122,18 +132,3 @@
      (core/$conj-cols (core/$rename-cols left-side left-repl)
                       (core/$remove-cols (core/$rename-cols right-side right-repl)
                                          common-join-cols)))))
-
-
-(def df1 (core/$df :x [:l :a :b :b :c :c :c :d :d :d :d]
-                   :y [:0 :1 :2 :2 :3 :3 :3 :4 :4 :4 :4]
-                   :a [1  2  3  4  5  6  7  8  9  10 11]))
-(def df2 (core/$df :x [:a :b :b :c :c :c :d :d :d :d :r]
-                   :y [:1 :2 :2 :3 :3 :3 :4 :4 :4 :4 :5]
-                   :a [1  2  3  4  5  6  7  8  9  10 11]))
-
-
-(def result
-  (join df1
-        df2
-        [:x :y]
-        :outer))
