@@ -1,5 +1,6 @@
 (ns explojure.print
-  (require [explojure.core :as core]))
+  (import explojure.dataframe.DataFrame)
+  (require [explojure.dataframe :as df]))
 
 (defn sp [x] (str " " x " "))
 (defn qu [x] (str "\"" x "\""))
@@ -37,8 +38,8 @@
 
 ;; here's the magic to converta dataframe to textual format
 (defn df->str [df]
-  (let [[columns data-hash] (core/$raw df)
-        new-df (core/->DataFrame columns
+  (let [[columns data-hash] (df/$raw df)
+        new-df (df/->DataFrame columns
                                  (reduce (fn [dh c]
                                            (let [old-col (vec (concat [c] (get dh c)))
                                                  new-col (map #(ensure-width
@@ -49,7 +50,7 @@
                                              (assoc dh c new-col)))
                                          data-hash
                                          columns))
-        rows (core/$rows new-df)]
+        rows (df/$rows new-df)]
     (let [headers (first rows)
           data-rows (rest rows)
           header-line (col-dividers headers)]
@@ -61,10 +62,10 @@
                            (col-dividers r))
                          [(str (apply str (repeat (- (count header-line) 1) "-")) "\n")])))))
 
+
 ;; to make DataFrames display correctly at the REPL
-(defmethod print-method explojure.core.DataFrame [x ^java.io.Writer w]
+(defmethod print-method explojure.dataframe.DataFrame [x ^java.io.Writer w]
   (.write w (df->str x)))
 
 ;; print a dataframe
-(defn print-df [df] (print df))
-
+(defn print-df [df] (print (df->str df)))

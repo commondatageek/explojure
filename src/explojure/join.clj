@@ -1,5 +1,5 @@
 (ns explojure.join
-  (:require [explojure.core :as core]
+  (:require [explojure.dataframe :as df]
             [clojure.set :as set]))
 
 (defn gen-index [& cols]
@@ -65,7 +65,7 @@
 
 (defn empty-df [colnames nrows]
   (let [empty-col (vec (repeat nrows nil))]
-    (apply core/$df (interleave colnames (repeat empty-col)))))
+    (apply df/$df (interleave colnames (repeat empty-col)))))
 
 (defn avoid-collisions [l-join r-join l r]
   (let [l-non-join (set/difference (set l) (set l-join))
@@ -87,8 +87,8 @@
   ([left right on join-type] (join left right on on join-type))
   ([left right left-on right-on join-type]
    (let [;; create index for key columns on left and right DFs
-         l-idx (apply gen-index (for [c left-on] (core/$col left c)))
-         r-idx (apply gen-index (for [c right-on] (core/$col right c)))
+         l-idx (apply gen-index (for [c left-on] (df/$col left c)))
+         r-idx (apply gen-index (for [c right-on] (df/$col right c)))
 
          ;; choose the row indices to draw from each DF
          [left-only
@@ -98,37 +98,37 @@
                                    (filter-keys l-idx r-idx join-type))
 
          ;; column names in the DFs
-         left-cols (core/$colnames left)
-         right-cols (core/$colnames right)
+         left-cols (df/$colnames left)
+         right-cols (df/$colnames right)
 
          ;; intersect join columns
          common-join-cols (set/intersection (set left-on) (set right-on))
 
          ;; get the appropriate rows from each DF
-         ri-rows (core/$ right right-cols right-inner)
+         ri-rows (df/$ right right-cols right-inner)
          re-rows (empty-df right-cols (count left-only))
-         ro-rows (core/$ right right-cols right-only)
+         ro-rows (df/$ right right-cols right-only)
 
-         li-rows (core/$ left left-cols left-inner)
-         lo-rows (core/$ left left-cols left-only)
+         li-rows (df/$ left left-cols left-inner)
+         lo-rows (df/$ left left-cols left-only)
 
          ;; left-empty frame is special because we need to
          ;; grab the keys from the corresponding right-only
          ;; data frame
-         le-rows (core/$conj-cols (-> ro-rows
-                                      (core/$col right-on)
-                                      (core/$rename-cols (zipmap right-on left-on)))
+         le-rows (df/$conj-cols (-> ro-rows
+                                      (df/$col right-on)
+                                      (df/$rename-cols (zipmap right-on left-on)))
                                   (empty-df (remove #(contains? (set left-on) %)
                                                     left-cols)
                                             (count right-only)))
 
 
          ;; combine the rows for each side
-         left-side (reduce core/$conj-rows [li-rows lo-rows le-rows])
-         right-side (reduce core/$conj-rows [ri-rows re-rows ro-rows])
+         left-side (reduce df/$conj-rows [li-rows lo-rows le-rows])
+         right-side (reduce df/$conj-rows [ri-rows re-rows ro-rows])
 
          ;; avoid column name collisions with _x and _y
          [left-repl right-repl] (avoid-collisions left-on right-on left-cols right-cols)]
-     (core/$conj-cols (core/$rename-cols left-side left-repl)
-                      (core/$remove-cols (core/$rename-cols right-side right-repl)
+     (df/$conj-cols (df/$rename-cols left-side left-repl)
+                      (df/$remove-cols (df/$rename-cols right-side right-repl)
                                          common-join-cols)))))
