@@ -13,15 +13,19 @@
                     [[] (hash-set)]
                     xs)))
 
+(defn rename-key [m old-key new-key]
+  (if (or (not (contains? m old-key))
+          (= old-key new-key))
+    m
+    (dissoc (assoc m new-key (get m old-key))
+            old-key)))
+
 (defn rename-keys [m rename]
-  (reduce (fn [updated k]
-            (let [repl-k (get rename k)
-                  v (get updated k)]
-              (if (nil? v)
-                updated
-                (dissoc (assoc updated repl-k v) k))))
+  (reduce (fn [updated repl-pair]
+            (let [[old-key new-key] repl-pair]
+              (rename-key updated old-key new-key)))
           m
-          (keys rename)))
+          (seq rename)))
 
 
 (defn $df
@@ -177,9 +181,9 @@
                 ($colnames d2)))))
 
   ($rename-cols [this repl-map]
-    (new DataFrame (replace repl-map columns)
-         (rename-keys data-hash
-                      repl-map)))
+                (new DataFrame
+                     (replace repl-map columns)
+                     (rename-keys data-hash repl-map)))
 
   ($remove-cols [this cols]
     (new DataFrame
