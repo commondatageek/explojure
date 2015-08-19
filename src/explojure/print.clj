@@ -1,5 +1,6 @@
 (ns explojure.print
-  (import explojure.dataframe.DataFrame)
+  (import explojure.dataframe.DataFrame
+          java.util.regex.Matcher)
   (require [explojure.dataframe :as df]))
 
 (defn sp [x] (str " " x " "))
@@ -13,9 +14,13 @@
 (defn max-width [xs] (apply max (map width xs)))
 
 ;; constrain column width
+(defn re-qr [replacement]
+  (Matcher/quoteReplacement replacement))
 (defmulti ensure-width (fn [width x] (string? x)))
 (defmethod ensure-width true [width x]
-  (let [str-len (count x)
+  (let [x (clojure.string/replace x #"\n" (re-qr "\n"))
+        x (clojure.string/replace x #"\r" (re-qr "\r"))
+        str-len (count x)
         qu-len (+ str-len 2)
         pad-len (max 0 (- width qu-len))]
     (if (= pad-len 0)
