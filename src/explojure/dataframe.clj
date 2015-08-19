@@ -66,6 +66,7 @@
               "Join two Tabulars along the column axis")
   ($rename-cols [this repl-map])
   ($remove-cols [this cols])
+  ($replace-cols [this repl-map])
   ($raw [this]
         "Return the raw data structures underlying this DataFrame"))
 
@@ -192,6 +193,16 @@
          (reduce (fn [m c] (dissoc data-hash c))
                  data-hash
                  cols)))
+
+  ($replace-cols [this repl-map]
+    (new DataFrame
+         columns
+         (reduce (fn [m [key val]]
+                   (if (contains? m key)
+                     (assoc m key val)
+                     m))
+                 data-hash
+                 (seq repl-map))))
 
   ($raw [this]
         [columns data-hash])
