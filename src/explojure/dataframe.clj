@@ -71,10 +71,11 @@
   ($xf [this f from-col] [this f from-col to-col])
   ($xfc [this f from-col] [this f from-col to-col]))
 
-(deftype DataFrame [columns data-hash]
-  ;; A data table.  The core data structure is an array-map where
-  ;; the keys are column names and the values are vectors of
-  ;; column data.
+(deftype DataFrame
+    [columns   ; a vector keeping the order of the column names
+     row-count ; an integer giving the number of rows
+     data-hash ; a hash-map containing the column vectors
+     ]
   
   Tabular
   clojure.lang.IFn
@@ -108,13 +109,13 @@
                   cols)]
        (apply $df
               (interleave cols
-                          (mapv (fn [col] (if (nil? rows)
-                                            ($col this col)
-                                            (mapv ($col this col) rows)))
+                          (mapv (fn [col]
+                                  (if (nil? rows)
+                                    ($col this col)
+                                    (mapv ($col this col) rows)))
                                 cols)))))
   
-  ($nrow [this]
-         (count (data-hash (first (keys data-hash)))))
+  ($nrow [this] row-count)
   
   ($ncol [this]
          (count columns))
@@ -127,6 +128,7 @@
   ($map [this src-col f dst-col]
         (new DataFrame
              (conj columns dst-col)
+             row-count
              (assoc data-hash
                     dst-col
                     (mapv f (data-hash src-col)))))
@@ -141,6 +143,7 @@
                  (if (contains? data-hash col-name)
                    columns
                    (conj columns col-name))
+                 row-count
                  (assoc data-hash col-name col-data)))
 
   ($count [this]
@@ -183,12 +186,14 @@
   ($rename-cols [this repl-map]
                 (new DataFrame
                      (replace repl-map columns)
+                     row-count
                      (rename-keys data-hash repl-map)))
 
   ($remove-cols [this cols]
     (new DataFrame
          (remove #(contains? (set cols) %)
                  columns)
+         row-count
          (reduce (fn [m c] (dissoc data-hash c))
                  data-hash
                  cols)))
@@ -196,6 +201,7 @@
   ($replace-cols [this repl-map]
     (new DataFrame
          columns
+         row-count
          (reduce (fn [m [key val]]
                    (if (contains? m key)
                      (assoc m key val)
@@ -261,7 +267,10 @@
   [& keyvals]
   (let [idx (range (count keyvals))
         columns (mapv (vec keyvals)
-                     (filter even? idx))]
+                      (filter even? idx))
+        data-hash (apply hash-map keyvals)
+        row-count (count (second (first data-hash)))]
     (new DataFrame
          columns
-         (apply hash-map keyvals))))
+         row-count
+         data-hash)))
