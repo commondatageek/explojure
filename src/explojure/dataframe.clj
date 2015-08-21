@@ -56,8 +56,6 @@
   ($count [this]
     "Show the number of non-nil values in each column")
   ($describe [this])
-  ($add-col [this col name]
-            "Add a column to the dataframe")
   ($set-col [this name col-data]
             "Set new values for this column")
   ($conj-rows [this d2]
@@ -135,14 +133,12 @@
                                  (type ($col this %))))
                   ($colnames this)))
   
-  ($add-col [this col name]
+  ($set-col [this col-name col-data]
             (new DataFrame
-                 (conj columns name)
-                 (assoc data-hash name col)))
-  ($set-col [this name data-col]
-            (new DataFrame
-                 columns
-                 (assoc data-hash name data-col)))
+                 (if (contains? data-hash col-name)
+                   columns
+                   (conj columns col-name))
+                 (assoc data-hash col-name col-data)))
 
   ($count [this]
     (mapv (fn [col]
@@ -175,9 +171,9 @@
       (let [d2-cols ($colnames d2)]
         (reduce (fn [new-df col]
                   (let [raw ($col d2 col)]
-                    ($add-col new-df
-                              raw
-                              col)))
+                    ($set-col new-df
+                              col
+                              raw)))
                 this
                 ($colnames d2)))))
 
