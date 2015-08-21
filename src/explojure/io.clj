@@ -1,7 +1,7 @@
 (ns explojure.io
   (require [explojure.dataframe :as dataframe]
            [explojure.util :as util]
-           
+
            [clojure.data.csv :as csv]
            [clojure.java.io :as io]))
 
@@ -33,7 +33,7 @@
 
 (defn read-keyword [x]
   (if (string? x)
-    (if (= ":" (subs x 0 1))
+    (if (= (subs x 0 1) ":")
       (keyword (subs x 1))
       x)
     x))
@@ -51,8 +51,31 @@
       (csv/write-csv writer (concat [header] rows)))))
 
 
+(defn read-csv
+  "Read CSV file row-chunks rows at a time."
+  
+  ([f]
+   (read-csv f 10000))
+  
+  ([f row-chunks]
+   (with-open [reader (io/reader f)]
+     (let [csv-seq (csv/read-csv reader)
+           headers (sequence types-xf (first csv-seq))
+           columns (loop [output-cols (repeatedly (count headers) #(vector))
+                          remaining-rows (rest csv-seq)]
+                     (if (seq remaining-rows)
+                       (recur (map concat
+                                   output-cols
+                                   (util/rows->cols (take row-chunks remaining-rows)))
+                              (drop row-chunks remaining-rows))
+                       (mapv #(sequence types-xf %) output-cols)))]
+       (dataframe/->DataFrame headers
+                              (apply hash-map (interleave headers columns)))))))
 
-(defn read-csv [f]
+
+(defn read-csv-lazy
+  "Keeping this around for historical reasons at the moment.  Prefer read-csv."
+  [f]
   ;; for now, assuming at least that each CSV file has a header row
   (with-open [reader (io/reader f)]
     (let [csv-seq (csv/read-csv reader)
@@ -75,6 +98,4 @@
                  (rest rows))
           (dataframe/->DataFrame headers
                             (apply hash-map (interleave headers cols))))))))
-
-
 
