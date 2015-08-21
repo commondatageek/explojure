@@ -139,13 +139,16 @@
                   ($colnames this)))
   
   ($set-col [this col-name col-data]
-            (new DataFrame
-                 (if (contains? data-hash col-name)
-                   columns
-                   (conj columns col-name))
-                 row-count
-                 (assoc data-hash col-name col-data)))
-
+    (let [col-data (if (not (coll? col-data))
+                     (vec (repeat ($nrow this) col-data))
+                     col-data)]
+      (new DataFrame
+           (if (contains? data-hash col-name)
+             columns
+             (conj columns col-name))
+           row-count
+           (assoc data-hash col-name col-data))))
+  
   ($count [this]
     (mapv (fn [col]
             (count (filter (fn [x] (not (nil? x)))
