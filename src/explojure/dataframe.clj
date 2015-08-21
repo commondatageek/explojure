@@ -1,4 +1,5 @@
-(ns explojure.dataframe)
+(ns explojure.dataframe
+  (:require [explojure.util :as util]))
 
 (defn unwoven-array-map
   [keys values]
@@ -66,7 +67,9 @@
   ($remove-cols [this cols])
   ($replace-cols [this repl-map])
   ($raw [this]
-        "Return the raw data structures underlying this DataFrame"))
+        "Return the raw data structures underlying this DataFrame")
+  ($xf [this f from-col] [this f from-col to-col])
+  ($xfc [this f from-col] [this f from-col to-col]))
 
 (deftype DataFrame [columns data-hash]
   ;; A data table.  The core data structure is an array-map where
@@ -202,6 +205,40 @@
 
   ($raw [this]
         [columns data-hash])
+
+  ($xf [this f from-col]
+       ($xf this f from-col from-col))
+
+  ($xf [this f from-col to-col]
+       (if (= (count from-col) 1)
+         ;; one column, value by value
+         ($set-col this
+                   (first to-col)
+                   (map f ($col this (first from-col))))
+         ;; multiple columns, value by value
+         (let [col-subset ($col this from-col)]
+           (reduce (fn [old-df [colname data]]
+                     ($set-col old-df colname data))
+                   this
+                   (map vector
+                        to-col
+                        (util/rows->cols (map f ($rows col-subset))))))))
+
+  ($xfc [this f from-col]
+        ($xfc this f from-col from-col))
+
+  ($xfc [this f from-col to-col]
+        (if (= (count from-col) 1)
+          ($set-col this
+                    (first to-col)
+                    (f ($col this (first from-col))))
+          (reduce (fn [old-df [colname data]]
+                    ($set-col old-df colname data))
+                  this
+                  (map vector
+                       to-col
+                       (f (map #($col this %) from-col))))))
+  
   
   
 
@@ -228,4 +265,3 @@
     (new DataFrame
          columns
          (apply hash-map keyvals))))
-
