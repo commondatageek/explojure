@@ -71,6 +71,7 @@
                        (map vec
                             (mapv #(sequence types-xf %) output-cols))))]
        (dataframe/->DataFrame headers
+                              (count (first columns))
                               (apply hash-map (interleave headers columns)))))))
 
 
