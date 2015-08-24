@@ -1,6 +1,12 @@
 (ns explojure.dataframe
   (:require [explojure.util :as util]))
 
+
+(defn vconcat [& args] (vec (apply concat args)))
+(defn vconj [& args] (vec (apply conj args)))
+(defn vmap [& args] (vec (apply map args)))
+(defn vrepeat [& args] (vec (apply repeat args)))
+
 (defn unwoven-array-map
   [keys values]
   (apply array-map (interleave keys values)))
@@ -100,7 +106,7 @@
                         (if (seq (first ordered-lazy))
                           (cons (vec (for [c ordered-lazy] (first c)))
                                 (lazy-seq (row-fn (vec (for [c ordered-lazy] (rest c))))))))]
-           (rcr-fn (for [c (map data-hash columns)]
+           (rcr-fn (for [c (vmap data-hash columns)]
                      (lazy-seq c)))))
   
   ($ [this cols rows]
@@ -109,10 +115,10 @@
                   cols)]
        (apply $df
               (interleave cols
-                          (mapv (fn [col]
+                          (vmap (fn [col]
                                   (if (nil? rows)
                                     ($col this col)
-                                    (mapv ($col this col) rows)))
+                                    (vmap ($col this col) rows)))
                                 cols)))))
   
   ($nrow [this] row-count)
@@ -124,33 +130,33 @@
              columns)
   
   ($map [this src-col f]
-    (mapv f (data-hash src-col)))
+    (vmap f (data-hash src-col)))
   ($map [this src-col f dst-col]
         (new DataFrame
-             (conj columns dst-col)
+             (vconj columns dst-col)
              row-count
              (assoc data-hash
                     dst-col
-                    (mapv f (data-hash src-col)))))
+                    (vmap f (data-hash src-col)))))
   
   ($describe [this]
-             (map #(println (str % ": "
+             (vmap #(println (str % ": "
                                  (type ($col this %))))
                   ($colnames this)))
   
   ($set-col [this col-name col-data]
     (let [col-data (if (not (coll? col-data))
-                     (vec (repeat ($nrow this) col-data))
+                     (vrepeat ($nrow this) col-data)
                      col-data)]
       (new DataFrame
            (if (contains? data-hash col-name)
              columns
-             (conj columns col-name))
+             (vconj columns col-name))
            row-count
            (assoc data-hash col-name col-data))))
   
   ($count [this]
-    (mapv (fn [col]
+    (vmap (fn [col]
             (count (filter (fn [x] (not (nil? x)))
                            ($col this col))))
           ($colnames this)))
@@ -160,17 +166,17 @@
       this
       (let [this-cols ($colnames this)
             d2-cols ($colnames d2)
-            unique-cols (unique (concat this-cols d2-cols))]
+            unique-cols (unique (vconcat this-cols d2-cols))]
         (apply $df
                (interleave unique-cols
-                           (map (fn [x]
+                           (vmap (fn [x]
                                   (let [this-vals ($col this x)
                                         d2-vals ($col d2 x)]
-                                    (concat (if (nil? this-vals)
-                                              (repeat ($nrow d2) nil)
+                                    (vconcat (if (nil? this-vals)
+                                              (vrepeat ($nrow d2) nil)
                                               this-vals)
                                             (if (nil? d2-vals)
-                                              (repeat ($nrow this) nil)
+                                              (vrepeat ($nrow this) nil)
                                               d2-vals))))
                                 unique-cols))))))
 
@@ -223,15 +229,15 @@
          ;; one column, value by value
          ($set-col this
                    (first to-col)
-                   (map f ($col this (first from-col))))
+                   (vmap f ($col this (first from-col))))
          ;; multiple columns, value by value
          (let [col-subset ($col this from-col)]
            (reduce (fn [old-df [colname data]]
                      ($set-col old-df colname data))
                    this
-                   (map vector
+                   (vmap vector
                         to-col
-                        (util/rows->cols (map f ($rows col-subset))))))))
+                        (util/rows->cols (vmap f ($rows col-subset))))))))
 
   ($xfc [this f from-col]
         ($xfc this f from-col from-col))
@@ -244,9 +250,9 @@
           (reduce (fn [old-df [colname data]]
                     ($set-col old-df colname data))
                   this
-                  (map vector
+                  (vmap vector
                        to-col
-                       (f (map #($col this %) from-col))))))
+                       (f (vmap #($col this %) from-col))))))
   
   
   
@@ -269,7 +275,7 @@
   "
   [& keyvals]
   (let [idx (range (count keyvals))
-        columns (mapv (vec keyvals)
+        columns (vmap (vec keyvals)
                       (filter even? idx))
         data-hash (apply hash-map keyvals)
         row-count (count (second (first data-hash)))]
