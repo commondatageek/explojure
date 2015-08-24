@@ -68,7 +68,8 @@
                                    output-cols
                                    (util/rows->cols (take row-chunks remaining-rows)))
                               (drop row-chunks remaining-rows))
-                       (mapv #(sequence types-xf %) output-cols)))]
+                       (map vec
+                            (mapv #(sequence types-xf %) output-cols))))]
        (dataframe/->DataFrame headers
                               (apply hash-map (interleave headers columns)))))))
 
