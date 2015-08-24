@@ -70,7 +70,7 @@
                               (drop row-chunks remaining-rows))
                        (map vec
                             (mapv #(sequence types-xf %) output-cols))))]
-       (dataframe/->DataFrame headers
+       (dataframe/->DataFrame (vec headers)
                               (count (first columns))
                               (apply hash-map (interleave headers columns)))))))
 
