@@ -105,12 +105,12 @@
          common-join-cols (set/intersection (set left-on) (set right-on))
 
          ;; get the appropriate rows from each DF
-         ri-rows (df/$ right right-cols right-inner)
+         ri-rows (df/$ right right-inner right-cols)
          re-rows (empty-df right-cols (count left-only))
-         ro-rows (df/$ right right-cols right-only)
+         ro-rows (df/$ right right-only right-cols)
 
-         li-rows (df/$ left left-cols left-inner)
-         lo-rows (df/$ left left-cols left-only)
+         li-rows (df/$ left left-inner left-cols)
+         lo-rows (df/$ left left-only left-cols)
 
          ;; left-empty frame is special because we need to
          ;; grab the keys from the corresponding right-only

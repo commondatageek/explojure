@@ -46,7 +46,7 @@
         "Return the specified row(s)")
   ($rows [this]
          "Return a lazy sequence of row vectors ")
-  ($ [this cols rows]
+  ($ [this rows cols]
     "Select the specified columns and rows from this")
   ($nrow [this]
     "Return the number of rows")
@@ -83,20 +83,22 @@
   Tabular
   clojure.lang.IFn
 
-  (invoke [this cols rows]
-          ($ this cols rows))
+  (invoke [this rows cols]
+          ($ this rows cols))
   
   ($col [this col]
         (if (sequential? col)
           ;; if > 1 column names passed, return DataFrame
-          ($ this col nil)
+          ($ this nil col)
           ;; if 1 column name passed, return vector
           (data-hash col)))
   
   ($row [this row]
-        ($ this nil (if (sequential? row)
-                      row
-                      [row])))
+        ($ this
+           (if (sequential? row)
+             row
+             [row])
+           nil))
 
   ($rows [this]
          (let [rcr-fn (fn row-fn [ordered-lazy]
@@ -106,7 +108,7 @@
            (rcr-fn (for [c (vmap data-hash columns)]
                      (lazy-seq c)))))
   
-  ($ [this cols rows]
+  ($ [this rows cols]
      (let [cols (if (nil? cols)
                   ($colnames this)
                   cols)]
