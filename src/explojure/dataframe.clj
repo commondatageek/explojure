@@ -147,7 +147,7 @@
   ($set-col [this col-name col-data]
     (let [col-data (if (not (coll? col-data))
                      (vrepeat ($nrow this) col-data)
-                     col-data)]
+                     (vec col-data))]
       (new DataFrame
            (if (contains? data-hash col-name)
              columns
