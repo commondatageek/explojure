@@ -1,11 +1,15 @@
 (ns explojure.dataframe
-  (:require [explojure.util :as util]))
 
+(defmacro vectorize [lazy-fns]
+  (concat '(do)
+          (for [f lazy-fns]
+            `(def ~(symbol (str "v" f))
+               (fn [& ~'args]
+                 (vec (apply ~f ~'args)))))))
 
-(defn vconcat [& args] (vec (apply concat args)))
-(defn vconj [& args] (vec (apply conj args)))
-(defn vmap [& args] (vec (apply map args)))
-(defn vrepeat [& args] (vec (apply repeat args)))
+(vectorize [concat conj dedupe distinct doall drop drop-last drop-while
+            filter interleave interpose keep keys map partition pmap
+            range remove repeat reverse take take-nth take-while vals])
 
 (defn unwoven-array-map
   [keys values]
@@ -114,7 +118,7 @@
                   ($colnames this)
                   cols)]
        (apply $df
-              (interleave cols
+              (vinterleave cols
                           (vmap (fn [col]
                                   (if (nil? rows)
                                     ($col this col)
@@ -157,7 +161,7 @@
   
   ($count [this]
     (vmap (fn [col]
-            (count (filter (fn [x] (not (nil? x)))
+            (count (vfilter (fn [x] (not (nil? x)))
                            ($col this col))))
           ($colnames this)))
 
@@ -166,9 +170,9 @@
       this
       (let [this-cols ($colnames this)
             d2-cols ($colnames d2)
-            unique-cols (unique (vconcat this-cols d2-cols))]
+            unique-cols (vdistinct (vconcat this-cols d2-cols))]
         (apply $df
-               (interleave unique-cols
+               (vinterleave unique-cols
                            (vmap (fn [x]
                                   (let [this-vals ($col this x)
                                         d2-vals ($col d2 x)]
@@ -200,7 +204,7 @@
 
   ($remove-cols [this cols]
     (new DataFrame
-         (remove #(contains? (set cols) %)
+         (vremove #(contains? (set cols) %)
                  columns)
          row-count
          (reduce (fn [m c] (dissoc data-hash c))
@@ -274,12 +278,12 @@
   Data vector should be the same length.
   "
   [& keyvals]
-  (let [idx (range (count keyvals))
+  (let [idx (vrange (count keyvals))
         columns (vmap (vec keyvals)
-                      (filter even? idx))
-        data-hash (apply hash-map keyvals)
-        row-count (count (second (first data-hash)))]
     (new DataFrame
+                      (vfilter even? idx))
+        row-count (count (second (first data-hash)))]
+        data-hash (apply hash-map keyvals)]
          columns
          row-count
          data-hash)))
