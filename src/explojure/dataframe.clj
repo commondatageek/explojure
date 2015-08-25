@@ -60,6 +60,13 @@
   ($count [this]
     "Show the number of non-nil values in each column")
   ($describe [this])
+
+  ($add-col [this col-name col-data]
+            "Add a new column. Fails if column already exists.")
+
+  ($replace-col [this col-name col-data]
+                "Replace an existing column. Fails if column does not exist.")
+  
   ($set-col [this name col-data]
             "Set new values for this column")
   ($conj-rows [this d2]
@@ -142,15 +149,26 @@
                                  (type ($col this %))))
                   ($colnames this)))
   
+  ($add-col [this col-name col-data]
+    (do
+      (when (contains? data-hash col-name)
+        (throw (new Exception (str "Can't add column " col-name ". Already exists."))))
+      ($set-col this col-name col-data)))
+
+  ($replace-col [this col-name col-data]
+    (do
+      (when-not (contains? data-hash col-name)
+        (throw (new Exception (str "Can't replace column " col-name ". Does not exist."))))
+      ($set-col this col-name col-data)))
+
   ($set-col [this col-name col-data]
     (let [col-data (if (not (coll? col-data))
                      (vrepeat ($nrow this) col-data)
                      (vec col-data))]
-      (new-dataframe
-           (if (contains? data-hash col-name)
-             columns
-             (vconj columns col-name))
-           (assoc data-hash col-name col-data))))
+      (new-dataframe (if (contains? data-hash col-name)
+                       columns
+                       (vconj columns col-name))
+                     (assoc data-hash col-name col-data))))
   
   ($count [this]
     (vmap (fn [col]
