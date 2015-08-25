@@ -70,9 +70,8 @@
                               (drop row-chunks remaining-rows))
                        (map vec
                             (mapv #(sequence types-xf %) output-cols))))]
-       (dataframe/->DataFrame (vec headers)
-                              (count (first columns))
-                              (apply hash-map (interleave headers columns)))))))
+       (dataframe/new-dataframe (vec headers)
+                                (apply hash-map (interleave headers columns)))))))
 
 
 (defn read-csv-lazy
@@ -98,6 +97,6 @@
                               (rest row-vals)))
                      cols))
                  (rest rows))
-          (dataframe/->DataFrame headers
-                            (apply hash-map (interleave headers cols))))))))
+          (dataframe/new-dataframe headers
+                                   (apply hash-map (interleave headers cols))))))))
 

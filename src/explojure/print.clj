@@ -44,18 +44,17 @@
 ;; here's the magic to converta dataframe to textual format
 (defn df->str [df]
   (let [[columns data-hash] (df/$raw df)
-        new-df (df/->DataFrame columns
-                               (df/$nrow df)
-                               (reduce (fn [dh c]
-                                         (let [old-col (vec (concat [c] (get dh c)))
-                                               new-col (map #(ensure-width
-                                                              (min (max-width old-col)
-                                                                   30)
-                                                              %)
-                                                            old-col)]
-                                           (assoc dh c new-col)))
-                                       data-hash
-                                       columns))
+        new-df (df/new-dataframe columns
+                                 (reduce (fn [dh c]
+                                           (let [old-col (vec (concat [c] (get dh c)))
+                                                 new-col (map #(ensure-width
+                                                                (min (max-width old-col)
+                                                                     30)
+                                                                %)
+                                                              old-col)]
+                                             (assoc dh c new-col)))
+                                         data-hash
+                                         columns))
         rows (df/$rows new-df)]
     (let [headers (first rows)
           data-rows (rest rows)

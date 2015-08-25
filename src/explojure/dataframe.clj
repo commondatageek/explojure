@@ -1,4 +1,6 @@
 (ns explojure.dataframe
+  (:require [explojure.util :as util]
+            [clojure.set :as s]))
 
 (defmacro vectorize [lazy-fns]
   (concat '(do)
@@ -11,27 +13,18 @@
             filter interleave interpose keep keys map partition pmap
             range remove repeat reverse take take-nth take-while vals])
 
-(defn unwoven-array-map
-  [keys values]
-  (apply array-map (interleave keys values)))
-
-(defn unique [xs]
-  (first (reduce (fn [a b]
-                      (let [[ord unq] a]
-                        (if (contains? unq b)
-                          [ord unq]
-                          [(conj ord b) (conj unq b)])))
-                    [[] (hash-set)]
-                    xs)))
-
-(defn rename-key [m old-key new-key]
+(defn rename-key
+  "In map m, rename old-key to new-key."
+  [m old-key new-key]
   (if (or (not (contains? m old-key))
           (= old-key new-key))
     m
     (dissoc (assoc m new-key (get m old-key))
             old-key)))
 
-(defn rename-keys [m rename]
+(defn rename-keys
+  "In map m, perform multiple key renames."
+  [m rename]
   (reduce (fn [updated repl-pair]
             (let [[old-key new-key] repl-pair]
               (rename-key updated old-key new-key)))
@@ -39,9 +32,9 @@
           (seq rename)))
 
 
-(defn $df
-  "Placeholder to allow compilation."
-  [& keyvals])
+;; Placeholder to allow compilation.
+(declare $df)
+(declare new-dataframe)
 
 (defprotocol Tabular
   "
@@ -136,9 +129,8 @@
   ($map [this src-col f]
     (vmap f (data-hash src-col)))
   ($map [this src-col f dst-col]
-        (new DataFrame
+        (new-dataframe
              (vconj columns dst-col)
-             row-count
              (assoc data-hash
                     dst-col
                     (vmap f (data-hash src-col)))))
@@ -152,11 +144,10 @@
     (let [col-data (if (not (coll? col-data))
                      (vrepeat ($nrow this) col-data)
                      (vec col-data))]
-      (new DataFrame
+      (new-dataframe
            (if (contains? data-hash col-name)
              columns
              (vconj columns col-name))
-           row-count
            (assoc data-hash col-name col-data))))
   
   ($count [this]
@@ -197,24 +188,21 @@
                 ($colnames d2)))))
 
   ($rename-cols [this repl-map]
-                (new DataFrame
+                (new-dataframe
                      (replace repl-map columns)
-                     row-count
                      (rename-keys data-hash repl-map)))
 
   ($remove-cols [this cols]
-    (new DataFrame
+    (new-dataframe
          (vremove #(contains? (set cols) %)
                  columns)
-         row-count
          (reduce (fn [m c] (dissoc data-hash c))
                  data-hash
                  cols)))
 
   ($replace-cols [this repl-map]
-    (new DataFrame
+    (new-dataframe
          columns
-         row-count
          (reduce (fn [m [key val]]
                    (if (contains? m key)
                      (assoc m key val)
@@ -280,10 +268,56 @@
   [& keyvals]
   (let [idx (vrange (count keyvals))
         columns (vmap (vec keyvals)
-    (new DataFrame
                       (vfilter even? idx))
-        row-count (count (second (first data-hash)))]
         data-hash (apply hash-map keyvals)]
+    (new-dataframe
          columns
-         row-count
          data-hash)))
+
+
+
+;; ways to create dataframes
+;; 1. hash-map: column name => column data
+;; 2. hash-map + column vector
+;; 3. alternating scalar/vector arguments
+;; 4.
+
+(defn set-equal [s1 s2]
+  (and
+   (empty? (s/difference s1 s2))
+   (empty? (s/difference s2 s1))))
+
+(defn equal-count [& colls]
+  (apply = (for [c colls]
+             (count c))))
+
+(defn vectorize-vals
+  "Make certain that all vals in the map m are vectors."
+  [m]
+  (reduce (fn [old-m k]
+            (assoc old-m k (vec (get old-m k))))
+          m
+          (keys m)))
+
+(defn new-dataframe
+  "Create a new DataFrame.
+
+  Arguments
+  - columns: a vector of column names, giving the column order
+  - data-map: a hash- or array-map mapping column names to data vectors.
+  
+  Must be 1:1 mapping of values in columns to keys in data-map.
+  All data vectors must be the same length."
+  [columns data-map]
+  ;; basic checks for data integrity
+  (when-not (set-equal (set columns) (set (vkeys data-map)))
+    (throw (new Exception "columns must have same values as data-map keys")))
+  (when-not (apply equal-count (vvals data-map))
+    (throw (new Exception "data-map values must be vectors of equal length")))
+
+  ;; create the DataFrame object
+  (let [nrow (count (first (vvals data-map)))]
+    (new DataFrame
+         (vec columns)
+         nrow
+         (vectorize-vals data-map))))
