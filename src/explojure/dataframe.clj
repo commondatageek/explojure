@@ -302,11 +302,6 @@
 ;; 3. alternating scalar/vector arguments
 ;; 4.
 
-(defn set-equal [s1 s2]
-  (and
-   (empty? (s/difference s1 s2))
-   (empty? (s/difference s2 s1))))
-
 (defn equal-count [& colls]
   (apply = (for [c colls]
              (count c))))
@@ -330,7 +325,7 @@
   All data vectors must be the same length."
   [columns data-map]
   ;; basic checks for data integrity
-  (when-not (set-equal (set columns) (set (vkeys data-map)))
+  (when-not (= (set columns) (set (vkeys data-map)))
     (throw (new Exception "columns must have same values as data-map keys")))
   (when-not (apply equal-count (vvals data-map))
     (throw (new Exception "data-map values must be vectors of equal length")))
