@@ -309,10 +309,10 @@
 (defn vectorize-vals
   "Make certain that all vals in the map m are vectors."
   [m]
-  (reduce (fn [old-m k]
-            (assoc old-m k (vec (get old-m k))))
+  (reduce-kv (fn [old-m k v]
+            (assoc old-m k (vec v)))
           m
-          (keys m)))
+          m))
 
 (defn new-dataframe
   "Create a new DataFrame.
