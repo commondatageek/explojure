@@ -1,6 +1,7 @@
 (ns explojure.dataframe
   (:require [explojure.util :as util]
-            [clojure.set :as s]))
+            [clojure.set :as s]
+            [clojure.test :as t]))
 
 (defmacro vectorize [lazy-fns]
   (concat '(do)
@@ -13,265 +14,248 @@
             filter interleave interpose keep keys map partition pmap
             range remove repeat reverse take take-nth take-while vals])
 
-(defn rename-key
-  "In map m, rename old-key to new-key."
-  [m old-key new-key]
-  (if (or (not (contains? m old-key))
-          (= old-key new-key))
-    m
-    (dissoc (assoc m new-key (get m old-key))
-            old-key)))
-
-(defn rename-keys
-  "In map m, perform multiple key renames."
-  [m rename]
-  (reduce (fn [updated repl-pair]
-            (let [[old-key new-key] repl-pair]
-              (rename-key updated old-key new-key)))
-          m
-          (seq rename)))
-
-
 ;; Placeholder to allow compilation.
-(declare $df)
 (declare new-dataframe)
 
 (defprotocol Tabular
-  "
-  The Tabular protocol represents tabular data.  (Rows and columns).
-  "
-  ($col [this col]
-    "Return the specified column(s)")
-  ($row [this row]
-        "Return the specified row(s)")
-  ($rows [this]
-         "Return a lazy sequence of row vectors ")
-  ($ [this rows cols]
-    "Select the specified columns and rows from this")
-  ($nrow [this]
-    "Return the number of rows")
-  ($ncol [this]
-    "Return the number of columns")
-  ($colnames [this]
-    "Return the column names")
-  ($map [this src-col f] [this src-col f dst-col]
-    "Return the result of (map)-ing src-col by function f.  If dst-col is
-  given, return this Tabular with a new column.")
-  ($count [this]
-    "Show the number of non-nil values in each column")
-  ($describe [this])
+  "The Tabular protocol represents tabular data.  (Rows and columns)."
 
-  ($add-col [this col-name col-data]
-            "Add a new column. Fails if column already exists.")
-
-  ($replace-col [this col-name col-data]
-                "Replace an existing column. Fails if column does not exist.")
-  
-  ($set-col [this name col-data]
-            "Set new values for this column")
-  ($conj-rows [this d2]
-              "Join two Tabulars along the row axis")
-  ($conj-cols [this d2]
-              "Join two Tabulars along the column axis")
+  ($col [this col] "Return the specified column(s)")
+  ($row [this row] "Return the specified row(s)")
+  ($rows [this] "Return a lazy sequence of row vectors ")
+  ($ [this rows cols] "Select the specified columns and rows from this")
+  ($nrow [this] "Return the number of rows")
+  ($ncol [this] "Return the number of columns")
+  ($colnames [this] "Return the column names")
+  ($map [this src-col f]
+        [this src-col f dst-col]
+        "Return the result of (map)-ing src-col by function f.  If dst-col is given, return this Tabular with a new column.")
+  ($count [this] "Show the number of non-nil values in each column")
+  ($describe [this])  
+  ($add-col [this col-name col-data] "Add a new column. Fails if column already exists.")
+  ($replace-col [this col-name col-data] "Replace an existing column. Fails if column does not exist.")
+  ($set-col [this name col-data] "Set new values for this column")
+  ($conj-rows [this d2] "Join two Tabulars along the row axis")
+  ($conj-cols [this d2] "Join two Tabulars along the column axis")
   ($rename-cols [this repl-map])
   ($remove-cols [this cols])
   ($replace-cols [this repl-map])
-  ($raw [this]
-        "Return the raw data structures underlying this DataFrame")
+  ($raw [this] "Return the raw data structures underlying this DataFrame")
   ($xf [this f from-col] [this f from-col to-col])
   ($xfc [this f from-col] [this f from-col to-col]))
 
+(defn all-equal?
+  "Return true if all xs are equal. For large xs, this fail-fast
+implementation may be more efficient than applying all xs as parameters
+to apply."
+  [xs]
+  (let [x1 (first xs)
+        x2 (fnext xs)]
+      (if (or (nil? x1)
+              (nil? x2))
+        true
+        (if (not= x1 x2)
+          false
+          (recur (next xs))))))
+
+(defn unique? [xs]
+  (= (count xs)
+     (count (vdistinct xs))))
+
+(defn ensure-type
+  ([x t]
+   (ensure-type x t "Argument x must have type t."))
+
+  ([x t err-msg]
+   (when (not= (type x) t)
+     (throw (new Exception err-msg)))
+   true))
+
+(defn ensure-vvector
+  ([xs]
+   (ensure-vvectors xs "Argument xs must be a vector of vectors."))
+
+  ([xs err-msg]
+   (ensure-vector xs err-msg)
+   (doseq [x xs]
+     (ensure-vector x err-msg))
+   true))
+
+(defn ensure-equal
+  ([a b]
+   (ensure-equal a b "Arugments a and b must be equal"))
+
+  ([a b err-msg]
+   (when (not= a b)
+     (throw (new Exception err-msg)))
+   true))
+
+(defn ensure-all-equal
+  ([xs]
+   (ensure-all-equal xs "All elements of xs must be equal."))
+
+  ([xs err-msg]
+   (when (not (all-equal? xs))
+     (throw (new Exception err-msg)))
+   true))
+
+(defn ensure-membership
+  ([x s]
+   (ensure-membership x s "Argument x must be a member of set s."))
+
+  ([x s err-msg]
+   (when (not (contains? s x))
+     (throw (new Exception err-msg)))
+   true))
+
+(defn ensure-unique
+  ([xs]
+   (ensure-unique xs "Elements of xs must be unique."))
+
+  ([xs err-msg]
+   (when (not (unique? xs))
+     (throw (new Exception err-msg)))
+   true))
+
+(defn validate-columns [colnames columns]
+  ;; colnames must be a vector
+  (ensure-type colnames
+               clojure.lang.PersistentVector
+               "colnames argument must be a vector")
+
+  ;; colnames must all be unique
+  (ensure-unique colnames
+                 "colnames must be unique.")
+  
+  ;; columns must be a vector of vectors
+  (ensure-vvector columns
+                  "columns argument must be a vector of vectors")
+
+  ;; column vectors must have the same length
+  (ensure-all-equal (map count columns)
+                    "All columns must have the same length.")
+  
+  ;; colnames must have same length as columns
+  (ensure-equal (count colnames)
+                (count columns)
+                "There must be a 1:1 correspondence of columns to column names.")
+
+  ;; all colnames must be the same type
+  (ensure-all-equal (map type colnames)
+                    "All colnames must have the same type.")
+
+  ;; colname type must be String, keyword, or integer
+  (when (> (count colnames) 0)
+    (ensure-membership (type (first colnames))
+                       #{;; strings
+                         java.lang.String
+                         ;; keywords
+                         clojure.lang.Keyword
+                         ;; integers
+                         clojure.lang.BigInt
+                         java.lang.Short
+                         java.lang.Integer
+                         java.lang.Long}
+                       "All colnames must be of type string, keyword, or integer"))
+  
+
+  true)
+
+(defn validate-rownames [rownames row-ct]
+  ;; rownames must be a vector
+  (ensure-type rownames
+               clojure.lang.PersistentVector
+               "rownames argument must be a vector")
+
+  ;; rownames must equal row-ct
+  (ensure-equal (count rownames)
+                row-ct
+                "rownames argument must have same length as columns")
+
+  ;; rownames must all be unique
+  (ensure-unique rownames
+                 "rownames must be unique.")
+  
+  ;; all rownames must be the same type
+  (ensure-all-equal (map type rownames)
+                    "All rownames must have the same type.")
+
+  ;; rowname type must be String, keyword, or integer
+  (when (> (count rownames) 0)
+    (ensure-membership (type (first rownames))
+                       #{;; strings
+                         java.lang.String
+                         ;; keywords
+                         clojure.lang.Keyword
+                         ;; integers
+                         clojure.lang.BigInt
+                         java.lang.Short
+                         java.lang.Integer
+                         java.lang.Long}
+                       "All rownames must be of type string, keyword, or integer"))
+  
+
+  true)
+
 (deftype DataFrame
-    [columns   ; a vector keeping the order of the column names
-     row-count ; an integer giving the number of rows
-     data-hash ; a hash-map containing the column vectors
-     ]
+    [colnames    ; a vector of column names, giving column order
+     columns     ; a vector of column vectors
+     column-ct   ; the number of columns
+     colname-idx ; a hash-map of colname => 0-based index
+     row-ct      ; the number of rows
+     rowname-idx ; (optional) a hash-map of rowname => 0-based index
+     ])
+
+(defn new-dataframe
+  ([colnames columns]
+   ;; ensure data assumptions
+   (validate-columns colnames columns)
+
+   ;; create a new DataFrame
+   (let [column-ct (count colnames)
+         colname-idx (reduce (fn [m [k i]]
+                               (assoc m k i))
+                             {}
+                             (map vector
+                                  colnames
+                                  (range column-ct)))
+         row-ct (count (first columns))]
+     (->DataFrame colnames
+                  columns
+                  column-ct
+                  colname-idx
+                  row-ct
+                  nil)))
+
+
   
-  Tabular
-  clojure.lang.IFn
+  ([colnames columns rownames]
+   ;; ensure column assumptions
+   (validate-columns colnames columns)
+   (let [column-ct (count colnames)
+         colname-idx (reduce (fn [m [k i]]
+                               (assoc m k i))
+                             {}
+                             (map vector
+                                  colnames
+                                  (range column-ct)))
+         row-ct (count (first columns))]
 
-  (invoke [this rows cols]
-          ($ this rows cols))
-  
-  ($col [this col]
-        (if (sequential? col)
-          ;; if > 1 column names passed, return DataFrame
-          ($ this nil col)
-          ;; if 1 column name passed, return vector
-          (data-hash col)))
-  
-  ($row [this row]
-        ($ this
-           (if (sequential? row)
-             row
-             [row])
-           nil))
-
-  ($rows [this]
-         (let [rcr-fn (fn row-fn [ordered-lazy]
-                        (if (seq (first ordered-lazy))
-                          (cons (vec (for [c ordered-lazy] (first c)))
-                                (lazy-seq (row-fn (vec (for [c ordered-lazy] (rest c))))))))]
-           (rcr-fn (for [c (vmap data-hash columns)]
-                     (lazy-seq c)))))
-  
-  ($ [this rows cols]
-     (let [cols (if (nil? cols)
-                  ($colnames this)
-                  cols)]
-       (apply $df
-              (vinterleave cols
-                          (vmap (fn [col]
-                                  (if (nil? rows)
-                                    ($col this col)
-                                    (vmap ($col this col) rows)))
-                                cols)))))
-  
-  ($nrow [this] row-count)
-  
-  ($ncol [this]
-         (count columns))
-  
-  ($colnames [this]
-             columns)
-  
-  ($map [this src-col f]
-    (vmap f (data-hash src-col)))
-  ($map [this src-col f dst-col]
-        (new-dataframe
-             (vconj columns dst-col)
-             (assoc data-hash
-                    dst-col
-                    (vmap f (data-hash src-col)))))
-  
-  ($describe [this]
-             (vmap #(println (str % ": "
-                                 (type ($col this %))))
-                  ($colnames this)))
-  
-  ($add-col [this col-name col-data]
-    (do
-      (when (contains? data-hash col-name)
-        (throw (new Exception (str "Can't add column " col-name ". Already exists."))))
-      ($set-col this col-name col-data)))
-
-  ($replace-col [this col-name col-data]
-    (do
-      (when-not (contains? data-hash col-name)
-        (throw (new Exception (str "Can't replace column " col-name ". Does not exist."))))
-      ($set-col this col-name col-data)))
-
-  ($set-col [this col-name col-data]
-    (let [col-data (if (not (coll? col-data))
-                     (vrepeat ($nrow this) col-data)
-                     (vec col-data))]
-      (new-dataframe (if (contains? data-hash col-name)
-                       columns
-                       (vconj columns col-name))
-                     (assoc data-hash col-name col-data))))
-  
-  ($count [this]
-    (vmap (fn [col]
-            (count (vfilter (fn [x] (not (nil? x)))
-                           ($col this col))))
-          ($colnames this)))
-
-  ($conj-rows [this d2]
-     (if (nil? d2)
-      this
-      (let [this-cols ($colnames this)
-            d2-cols ($colnames d2)
-            unique-cols (vdistinct (vconcat this-cols d2-cols))]
-        (apply $df
-               (vinterleave unique-cols
-                           (vmap (fn [x]
-                                  (let [this-vals ($col this x)
-                                        d2-vals ($col d2 x)]
-                                    (vconcat (if (nil? this-vals)
-                                              (vrepeat ($nrow d2) nil)
-                                              this-vals)
-                                            (if (nil? d2-vals)
-                                              (vrepeat ($nrow this) nil)
-                                              d2-vals))))
-                                unique-cols))))))
-
-  ($conj-cols [this d2]
-    (if (nil? d2)
-      this
-      (let [d2-cols ($colnames d2)]
-        (reduce (fn [new-df col]
-                  (let [raw ($col d2 col)]
-                    ($set-col new-df
-                              col
-                              raw)))
-                this
-                ($colnames d2)))))
-
-  ($rename-cols [this repl-map]
-                (new-dataframe
-                     (replace repl-map columns)
-                     (rename-keys data-hash repl-map)))
-
-  ($remove-cols [this cols]
-    (new-dataframe
-         (vremove #(contains? (set cols) %)
-                 columns)
-         (reduce (fn [m c] (dissoc data-hash c))
-                 data-hash
-                 cols)))
-
-  ($replace-cols [this repl-map]
-    (new-dataframe
-         columns
-         (reduce (fn [m [key val]]
-                   (if (contains? m key)
-                     (assoc m key val)
-                     m))
-                 data-hash
-                 (seq repl-map))))
-
-  ($raw [this]
-        [columns data-hash])
-
-  ($xf [this f from-col]
-       ($xf this f from-col from-col))
-
-  ($xf [this f from-col to-col]
-       (if (= (count from-col) 1)
-         ;; one column, value by value
-         ($set-col this
-                   (first to-col)
-                   (vmap f ($col this (first from-col))))
-         ;; multiple columns, value by value
-         (let [col-subset ($col this from-col)]
-           (reduce (fn [old-df [colname data]]
-                     ($set-col old-df colname data))
-                   this
-                   (vmap vector
-                        to-col
-                        (util/rows->cols (vmap f ($rows col-subset))))))))
-
-  ($xfc [this f from-col]
-        ($xfc this f from-col from-col))
-
-  ($xfc [this f from-col to-col]
-        (if (= (count from-col) 1)
-          ($set-col this
-                    (first to-col)
-                    (f ($col this (first from-col))))
-          (reduce (fn [old-df [colname data]]
-                    ($set-col old-df colname data))
-                  this
-                  (vmap vector
-                       to-col
-                       (f (vmap #($col this %) from-col))))))
-  
-  
-  
-
-  Object
-  (toString [this] (str "<DataFrame: " ($nrow this) "R, " ($ncol this) "C>")))
-
+     ;; ensure rowname assumptions
+     (validate-rownames rownames row-ct)
+     (let [rowname-idx (reduce (fn [m [k i]]
+                                 (assoc m k i))
+                               {}
+                               (map vector
+                                    rownames
+                                    (range row-ct)))]
+       ;; create a new DataFrame
+       (->DataFrame colnames
+                    columns
+                    column-ct
+                    colname-idx
+                    row-ct
+                    rowname-idx)))))
 
 (defn $df
   "
@@ -287,52 +271,10 @@
   "
   [& keyvals]
   (let [idx (vrange (count keyvals))
+        colnames (vmap (vec keyvals)
+                       (vfilter even? idx))
         columns (vmap (vec keyvals)
-                      (vfilter even? idx))
-        data-hash (apply hash-map keyvals)]
-    (new-dataframe
-         columns
-         data-hash)))
+                      (vfilter odd? idx))]
+    (new-dataframe colnames
+                   columns)))
 
-
-
-;; ways to create dataframes
-;; 1. hash-map: column name => column data
-;; 2. hash-map + column vector
-;; 3. alternating scalar/vector arguments
-;; 4.
-
-(defn equal-count [& colls]
-  (apply = (for [c colls]
-             (count c))))
-
-(defn vectorize-vals
-  "Make certain that all vals in the map m are vectors."
-  [m]
-  (reduce-kv (fn [old-m k v]
-            (assoc old-m k (vec v)))
-          m
-          m))
-
-(defn new-dataframe
-  "Create a new DataFrame.
-
-  Arguments
-  - columns: a vector of column names, giving the column order
-  - data-map: a hash- or array-map mapping column names to data vectors.
-  
-  Must be 1:1 mapping of values in columns to keys in data-map.
-  All data vectors must be the same length."
-  [columns data-map]
-  ;; basic checks for data integrity
-  (when-not (= (set columns) (set (vkeys data-map)))
-    (throw (new Exception "columns must have same values as data-map keys")))
-  (when-not (apply equal-count (vvals data-map))
-    (throw (new Exception "data-map values must be vectors of equal length")))
-
-  ;; create the DataFrame object
-  (let [nrow (count (first (vvals data-map)))]
-    (new DataFrame
-         (vec columns)
-         nrow
-         (vectorize-vals data-map))))
