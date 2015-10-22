@@ -193,21 +193,21 @@
      ])
 
 (defn new-dataframe
-  ([colnames columns]
+  ([cols vecs]
    ;; ensure data assumptions
-   (validate-columns colnames columns)
-
+   (validate-columns cols vecs)
+   
    ;; create a new DataFrame
-   (let [column-ct (count colnames)
+   (let [column-ct (count cols)
          colname-idx (reduce (fn [m [k i]]
                                (assoc m k i))
                              {}
                              (map vector
-                                  colnames
+                                  cols
                                   (range column-ct)))
-         row-ct (count (first columns))]
-     (->DataFrame colnames
-                  columns
+         row-ct (count (first vecs))]
+     (->DataFrame cols
+                  vecs
                   column-ct
                   colname-idx
                   row-ct
@@ -215,17 +215,17 @@
 
 
   
-  ([colnames columns rownames]
+  ([cols vecs rownames]
    ;; ensure column assumptions
-   (validate-columns colnames columns)
-   (let [column-ct (count colnames)
+   (validate-columns cols vecs)
+   (let [column-ct (count cols)
          colname-idx (reduce (fn [m [k i]]
                                (assoc m k i))
                              {}
                              (map vector
-                                  colnames
+                                  cols
                                   (range column-ct)))
-         row-ct (count (first columns))]
+         row-ct (count (first vecs))]
 
      ;; ensure rowname assumptions
      (validate-rownames rownames row-ct)
@@ -236,8 +236,8 @@
                                     rownames
                                     (range row-ct)))]
        ;; create a new DataFrame
-       (->DataFrame colnames
-                    columns
+       (->DataFrame cols
+                    vecs
                     column-ct
                     colname-idx
                     row-ct
@@ -257,10 +257,10 @@
   "
   [& keyvals]
   (let [idx (vrange (count keyvals))
-        colnames (vmap (vec keyvals)
+        cols (vmap (vec keyvals)
                        (vfilter even? idx))
-        columns (vmap (vec keyvals)
+        vecs (vmap (vec keyvals)
                       (vfilter odd? idx))]
-    (new-dataframe colnames
-                   columns)))
+    (new-dataframe cols
+                   vecs)))
 
