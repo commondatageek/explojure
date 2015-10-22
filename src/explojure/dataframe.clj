@@ -44,20 +44,6 @@
   ($xf [this f from-col] [this f from-col to-col])
   ($xfc [this f from-col] [this f from-col to-col]))
 
-(defn all-equal?
-  "Return true if all xs are equal. For large xs, this fail-fast
-implementation may be more efficient than applying all xs as parameters
-to apply."
-  [xs]
-  (let [x1 (first xs)
-        x2 (fnext xs)]
-      (if (or (nil? x1)
-              (nil? x2))
-        true
-        (if (not= x1 x2)
-          false
-          (recur (next xs))))))
-
 (defn unique? [xs]
   (= (count xs)
      (count (vdistinct xs))))
