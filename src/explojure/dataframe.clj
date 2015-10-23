@@ -3,46 +3,8 @@
             [clojure.set :as s]
             [clojure.test :as t]))
 
-(defmacro vectorize [lazy-fns]
-  (concat '(do)
-          (for [f lazy-fns]
-            `(def ~(symbol (str "v" f))
-               (fn [& ~'args]
-                 (vec (apply ~f ~'args)))))))
-
-(vectorize [concat conj dedupe distinct doall drop drop-last drop-while
-            filter interleave interpose keep keys map partition pmap
-            range remove repeat reverse take take-nth take-while vals])
-
 ;; Placeholder to allow compilation.
 (declare new-dataframe)
-
-(defprotocol Tabular
-  "The Tabular protocol represents tabular data.  (Rows and columns)."
-
-  ($col [this col] "Return the specified column(s)")
-  ($row [this row] "Return the specified row(s)")
-  ($rows [this] "Return a lazy sequence of row vectors ")
-  ($ [this rows cols] "Select the specified columns and rows from this")
-  ($nrow [this] "Return the number of rows")
-  ($ncol [this] "Return the number of columns")
-  ($colnames [this] "Return the column names")
-  ($map [this src-col f]
-        [this src-col f dst-col]
-        "Return the result of (map)-ing src-col by function f.  If dst-col is given, return this Tabular with a new column.")
-  ($count [this] "Show the number of non-nil values in each column")
-  ($describe [this])  
-  ($add-col [this col-name col-data] "Add a new column. Fails if column already exists.")
-  ($replace-col [this col-name col-data] "Replace an existing column. Fails if column does not exist.")
-  ($set-col [this name col-data] "Set new values for this column")
-  ($conj-rows [this d2] "Join two Tabulars along the row axis")
-  ($conj-cols [this d2] "Join two Tabulars along the column axis")
-  ($rename-cols [this repl-map])
-  ($remove-cols [this cols])
-  ($replace-cols [this repl-map])
-  ($raw [this] "Return the raw data structures underlying this DataFrame")
-  ($xf [this f from-col] [this f from-col to-col])
-  ($xfc [this f from-col] [this f from-col to-col]))
 
 (defn unique? [xs]
   (= (count xs)
@@ -183,6 +145,12 @@
 
   true)
 
+(defprotocol Tabular
+  "The Tabular protocol represents tabular data.  (Rows and columns)."
+
+  ($ [this row-spec col-spec]
+     [this [df col-spec]]))
+
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
      columns     ; a vector of column vectors
@@ -263,4 +231,5 @@
                       (vfilter odd? idx))]
     (new-dataframe cols
                    vecs)))
+
 
