@@ -1,14 +1,11 @@
-(ns explojure.dataframe
+(ns explojure.dataframe.validation
   (:require [explojure.util :as util]
             [clojure.set :as s]
             [clojure.test :as t]))
 
-;; Placeholder to allow compilation.
-(declare new-dataframe)
-
 (defn unique? [xs]
   (= (count xs)
-     (count (vdistinct xs))))
+     (count (util/vdistinct xs))))
 
 (defn ensure-type
   ([x t]
@@ -21,12 +18,12 @@
 
 (defn ensure-vvector
   ([xs]
-   (ensure-vvectors xs "Argument xs must be a vector of vectors."))
+   (ensure-vvector xs "Argument xs must be a vector of vectors."))
 
   ([xs err-msg]
-   (ensure-vector xs err-msg)
+   (ensure-type xs clojure.lang.PersistentVector err-msg)
    (doseq [x xs]
-     (ensure-vector x err-msg))
+     (ensure-type x clojure.lang.PersistentVector err-msg))
    true))
 
 (defn ensure-equal
@@ -43,7 +40,7 @@
    (ensure-all-equal xs "All elements of xs must be equal."))
 
   ([xs err-msg]
-   (when (not (all-equal? xs))
+   (when (not (apply = xs))
      (throw (new Exception err-msg)))
    true))
 
@@ -144,92 +141,3 @@
   
 
   true)
-
-(defprotocol Tabular
-  "The Tabular protocol represents tabular data.  (Rows and columns)."
-
-  ($ [this row-spec col-spec]
-     [this [df col-spec]]))
-
-(deftype DataFrame
-    [colnames    ; a vector of column names, giving column order
-     columns     ; a vector of column vectors
-     column-ct   ; the number of columns
-     colname-idx ; a hash-map of colname => 0-based index
-     row-ct      ; the number of rows
-     rowname-idx ; (optional) a hash-map of rowname => 0-based index
-     ])
-
-(defn new-dataframe
-  ([cols vecs]
-   ;; ensure data assumptions
-   (validate-columns cols vecs)
-   
-   ;; create a new DataFrame
-   (let [column-ct (count cols)
-         colname-idx (reduce (fn [m [k i]]
-                               (assoc m k i))
-                             {}
-                             (map vector
-                                  cols
-                                  (range column-ct)))
-         row-ct (count (first vecs))]
-     (->DataFrame cols
-                  vecs
-                  column-ct
-                  colname-idx
-                  row-ct
-                  nil)))
-
-
-  
-  ([cols vecs rownames]
-   ;; ensure column assumptions
-   (validate-columns cols vecs)
-   (let [column-ct (count cols)
-         colname-idx (reduce (fn [m [k i]]
-                               (assoc m k i))
-                             {}
-                             (map vector
-                                  cols
-                                  (range column-ct)))
-         row-ct (count (first vecs))]
-
-     ;; ensure rowname assumptions
-     (validate-rownames rownames row-ct)
-     (let [rowname-idx (reduce (fn [m [k i]]
-                                 (assoc m k i))
-                               {}
-                               (map vector
-                                    rownames
-                                    (range row-ct)))]
-       ;; create a new DataFrame
-       (->DataFrame cols
-                    vecs
-                    column-ct
-                    colname-idx
-                    row-ct
-                    rowname-idx)))))
-
-(defn $df
-  "
-  Create a new DataFrame. For now, assumes that:
-   - all vectors are of same length
-  
-  Arguments are alternating key value expressions such as one would
-  supply to the hash-map or array-map functions.  Keys are column
-  names, and values are sequentials (vectors, lists, etc.) containing
-  the data for each column.
-
-  Data vector should be the same length.
-  "
-  [& keyvals]
-  (let [idx (vrange (count keyvals))
-        cols (vmap (vec keyvals)
-                       (vfilter even? idx))
-        vecs (vmap (vec keyvals)
-                      (vfilter odd? idx))]
-    (new-dataframe cols
-                   vecs)))
-
-

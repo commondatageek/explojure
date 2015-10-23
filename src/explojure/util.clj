@@ -319,3 +319,14 @@ realized after the first pass."
   (if x true false))
 
 
+(defn vdistinct [& args]
+  (vec (apply distinct args)))
+
+(defn vrange [& args]
+  (vec (apply range args)))
+
+(defn vmap [& args]
+  (vec (apply map args)))
+
+(defn vfilter [& args]
+  (vec (apply filter args)))
