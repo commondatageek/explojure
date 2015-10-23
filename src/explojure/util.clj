@@ -308,3 +308,14 @@ realized after the first pass."
                     (for [f (file-seq path-file)]
                       (.getPath f)))]
                  filters)))
+
+(defn discard
+  "Return nil.  Useful for discarding large results at the REPL."
+  [& args])
+
+(defn booleanate
+  "Return the truth value of x."
+  [x]
+  (if x true false))
+
+
