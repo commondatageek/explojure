@@ -20,6 +20,7 @@
   (rownames [this])
   (ncol [this])
   (nrow [this])
+  (not-nil [this])
 
   (lookup-names [this axis xs])
 
@@ -55,6 +56,14 @@
   (rownames [this] rownames)
   (ncol [this] column-ct)
   (nrow [this] row-ct)
+  (not-nil
+   [this]
+   (new-dataframe [:column :count]
+                  [colnames (vec (for [c columns]
+                                 (count
+                                  (filter identity
+                                          (map #(not (nil? %))
+                                               c)))))]))
 
   ;; convert names to 0-based indices
   (lookup-names
