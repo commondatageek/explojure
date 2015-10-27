@@ -42,6 +42,7 @@
      columns     ; a vector of column vectors
      column-ct   ; the number of columns
      colname-idx ; a hash-map of colname => 0-based index
+     rownames    ; a vector of row names, in order
      row-ct      ; the number of rows
      rowname-idx ; (optional) a hash-map of rowname => 0-based index
      ]
@@ -179,6 +180,7 @@
                   vecs
                   column-ct
                   colname-idx
+                  nil
                   row-ct
                   nil)))
 
@@ -209,6 +211,7 @@
                     vecs
                     column-ct
                     colname-idx
+                    rownames
                     row-ct
                     rowname-idx)))))
 
