@@ -40,8 +40,11 @@
    (ensure-all-equal xs "All elements of xs must be equal."))
 
   ([xs err-msg]
-   (when (not (apply = xs))
-     (throw (new Exception err-msg)))
+   (if (= (count xs) 0)
+     true
+     (when (not (apply = xs))
+       (throw (new Exception err-msg))))
+   
    true))
 
 (defn ensure-membership

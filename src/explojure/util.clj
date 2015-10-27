@@ -310,23 +310,75 @@ realized after the first pass."
                  filters)))
 
 (defn discard
-  "Return nil.  Useful for discarding large results at the REPL."
-  [& args])
+  "Return nil. Useful at the REPL for discarding large results of functions called
+primarily for side effects."
+  [& args]
+  nil)
 
-(defn booleanate
-  "Return the truth value of x."
+(defn boolean?
+  "Determine if something is a strict boolean value (true/false)."
   [x]
-  (if x true false))
+  (case x
+    true  true
+    false true
+    false))
 
-
-(defn vdistinct [& args]
+(defn vdistinct
+  "Like distinct, but ensure vector output."
+  [& args]
   (vec (apply distinct args)))
 
 (defn vrange [& args]
+  "Like range, but ensure vector output."
   (vec (apply range args)))
 
 (defn vmap [& args]
+  "Like map, but ensure vector output."
   (vec (apply map args)))
 
 (defn vfilter [& args]
+  "like filter, but ensure vector output."
   (vec (apply filter args)))
+
+(defn M
+  "Shorthand for getting metadata from an object."
+  ([x key]
+   (M x key nil))
+  ([x key not-found-val]
+   (get (meta x) key not-found-val)))
+
+
+(defn exc-get
+  "Throw an exception if key is not found."
+  [m k]
+  (let [result (get m k :EXC-not-found)]
+    (if (= result :EXC-not-found)
+      (throw (new Exception (str "Key '" k "' not found.")))
+      result)))
+
+(defn no-nil?
+  "Return true if xs contains no nils. Assumes that xs is sequential."
+  [xs]
+  (if (seq xs)
+    (if (nil? (first xs))
+        false
+        (recur (next xs)))
+    true))
+
+(defn make-vector
+  "If x is a scalar value, wrap in a vector.  If sequential, ensure vector (vec)."[x]
+  (if (sequential? x)
+    (vec x)
+    [x]))
+
+(defn same-type
+  "Assumes that xs is sequential. If all xs have same type, return that type. Else false."
+  ([xs] (same-type (next xs) (type (first xs))))
+  ([xs t]
+   (if (not (seq xs))
+     t
+     (let [new-t (type (first xs))]
+       (if (not= t new-t)
+         false
+         (recur (next xs) t))))))
+
