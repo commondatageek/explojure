@@ -20,7 +20,7 @@
   (ncol [this])
   (nrow [this])
 
-  (lookup-indices [this axis xs])
+  (lookup-names [this axis xs])
 
   (col-vectors [this])
   (row-vectors [this])
@@ -54,7 +54,7 @@
   (nrow [this] row-ct)
 
   ;; convert names to 0-based indices
-  (lookup-indices
+  (lookup-names
    [this axis xs]
    (let [index (case axis
                  :rows rowname-idx
@@ -249,7 +249,7 @@
                                   :rows (row-vectors df)))))))
 
 (defn interpret-int-spec [df axis ints]
-  (let [n (lookup-indices df axis ints)]
+  (let [n (lookup-names df axis ints)]
     (if (util/no-nil? n)
       n
       ints)))
@@ -262,7 +262,7 @@
   (util/where bools))
 
 (defn interpret-name-spec [df axis names]
-  (let [n (lookup-indices df axis names)]
+  (let [n (lookup-names df axis names)]
     (if (util/no-nil? n)
       n
       (throw
