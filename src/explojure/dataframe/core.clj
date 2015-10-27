@@ -208,29 +208,11 @@
                   (util/vconcat columns (vals col-map))
                   rownames)))
 
+
+
 (defn new-dataframe
   ([cols vecs]
-   ;; ensure data assumptions
-   (valid/validate-columns cols vecs)
-   
-   ;; create a new DataFrame
-   (let [column-ct (count cols)
-         colname-idx (reduce (fn [m [k i]]
-                               (assoc m k i))
-                             {}
-                             (map vector
-                                  cols
-                                  (range column-ct)))
-         row-ct (count (first vecs))]
-     (->DataFrame cols
-                  vecs
-                  column-ct
-                  colname-idx
-                  nil
-                  row-ct
-                  nil)))
-
-
+   (new-dataframe cols vecs nil))
   
   ([cols vecs rownames]
    ;; ensure column assumptions
@@ -243,15 +225,18 @@
                                   cols
                                   (range column-ct)))
          row-ct (count (first vecs))]
-
-     ;; ensure rowname assumptions
-     (valid/validate-rownames rownames row-ct)
-     (let [rowname-idx (reduce (fn [m [k i]]
-                                 (assoc m k i))
-                               {}
-                               (map vector
-                                    rownames
-                                    (range row-ct)))]
+     (let [rowname-idx (if (not (nil? rownames))
+                         (do
+                           ;; ensure rowname assumptions
+                           (valid/validate-rownames rownames row-ct)
+                           (let [rowname-idx (reduce (fn [m [k i]]
+                                                       (assoc m k i))
+                                                     {}
+                                                     (map vector
+                                                          rownames
+                                                          (range row-ct)))]
+                             rowname-idx))
+                         nil)]
        ;; create a new DataFrame
        (->DataFrame cols
                     vecs
