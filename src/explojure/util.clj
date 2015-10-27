@@ -323,6 +323,11 @@ primarily for side effects."
     false true
     false))
 
+(defn vconcat
+  "Like concat, but ensure vector output."
+  [& args]
+  (vec (apply concat args)))
+
 (defn vdistinct
   "Like distinct, but ensure vector output."
   [& args]

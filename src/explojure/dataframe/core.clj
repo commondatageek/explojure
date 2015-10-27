@@ -37,7 +37,10 @@
   (drop-cols-by-index [this cols])
   (drop-rows-by-index [this cols])
   ($- [this col-spec]
-      [this col-spec row-spec]))
+      [this col-spec row-spec])
+
+  (add-col [this colname column]
+           [this col-map]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -114,13 +117,15 @@
   (select-cols-by-index
    [this cols]
    (new-dataframe (util/vmap colnames cols)
-                  (util/vmap columns cols)))
+                  (util/vmap columns cols)
+                  rownames))
   (select-rows-by-index
    [this rows]
    (new-dataframe colnames
                   (apply vector
                          (for [c columns]
-                           (util/vmap c rows)))))
+                           (util/vmap c rows)))
+                  rownames))
   ($
    [this col-spec]
    ($ this col-spec nil))
@@ -190,7 +195,18 @@
                     filtered
                     (let [row-indices (interpret-spec this :rows row-spec)]
                       (drop-rows-by-index filtered row-indices)))]
-     filtered)))
+     filtered))
+
+  (add-col
+   [this colname column]
+   (new-dataframe (conj colnames colname)
+                  (conj columns column)
+                  rownames))
+  (add-col
+   [this col-map]
+   (new-dataframe (util/vconcat colnames (keys col-map))
+                  (util/vconcat columns (vals col-map))
+                  rownames)))
 
 (defn new-dataframe
   ([cols vecs]
