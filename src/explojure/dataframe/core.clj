@@ -49,6 +49,17 @@
      rowname-idx ; (optional) a hash-map of rowname => 0-based index
      ]
 
+  clojure.lang.IFn
+
+  ;; invoke DataFrame as function to do a ($) select operation
+  (invoke
+   [this col-spec row-spec]
+   ($ this col-spec row-spec))
+  
+  (invoke
+   [this col-spec]
+   ($ this col-spec))
+
   Tabular
 
   ;; get simple attributes
@@ -111,6 +122,10 @@
                          (for [c columns]
                            (util/vmap c rows)))))
   ($
+   [this col-spec]
+   ($ this col-spec nil))
+  
+  ($
    [this col-spec row-spec]
    ;; if either or both of the specifiers are nil,
    ;;   don't apply filter to that axis.
@@ -157,6 +172,10 @@
      (select-rows-by-index this
                            (util/vfilter #(not (drop-set %))
                                          (util/vrange row-ct)))))
+
+  ($-
+   [this col-spec]
+   ($- this col-spec nil))
 
   ($-
    [this col-spec row-spec]
