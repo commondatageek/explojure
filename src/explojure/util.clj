@@ -340,6 +340,10 @@ primarily for side effects."
   "like filter, but ensure vector output."
   (vec (apply filter args)))
 
+(defn vflatten [& args]
+  "Like flatten, but ensure vector output."
+  (vec (apply flatten args)))
+
 (defn M
   "Shorthand for getting metadata from an object."
   ([x key]

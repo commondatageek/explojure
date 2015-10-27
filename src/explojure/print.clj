@@ -1,7 +1,8 @@
 (ns explojure.print
-  (import explojure.dataframe.DataFrame
+  (import explojure.dataframe.core.DataFrame
           java.util.regex.Matcher)
-  (require [explojure.dataframe :as df]))
+  (require [explojure.dataframe.core :as df-core]
+           [explojure.util :as util]))
 
 (defn sp [x] (str " " x " "))
 (defn qu [x] (str "\"" x "\""))
@@ -43,19 +44,18 @@
 
 ;; here's the magic to converta dataframe to textual format
 (defn df->str [df]
-  (let [[columns data-hash] (df/$raw df)
-        new-df (df/new-dataframe columns
-                                 (reduce (fn [dh c]
-                                           (let [old-col (vec (concat [c] (get dh c)))
-                                                 new-col (map #(ensure-width
-                                                                (min (max-width old-col)
-                                                                     30)
-                                                                %)
-                                                              old-col)]
-                                             (assoc dh c new-col)))
-                                         data-hash
-                                         columns))
-        rows (df/$rows new-df)]
+  (let [colnames (df-core/colnames df)
+        columns (df-core/col-vectors df)
+        new-df (df-core/new-dataframe colnames
+                                      (util/vmap (fn [col]
+                                                   (let [mx-wd (max-width col)
+                                                         wd (min mx-wd 30)]
+                                                     (util/vmap #(ensure-width wd %)
+                                                                col)))
+                                                 (util/vmap #(util/vflatten (vector %1 %2))
+                                                            colnames
+                                                            columns)))
+        rows (df-core/row-vectors new-df)]
     (let [headers (first rows)
           data-rows (rest rows)
           header-line (col-dividers headers)]
@@ -69,8 +69,10 @@
 
 
 ;; to make DataFrames display correctly at the REPL
-(defmethod print-method explojure.dataframe.DataFrame [x ^java.io.Writer w]
+(defmethod print-method explojure.dataframe.core.DataFrame [x ^java.io.Writer w]
   (.write w (df->str x)))
 
 ;; print a dataframe
 (defn print-df [df] (print (df->str df)))
+
+
