@@ -1,4 +1,4 @@
-(ns explojure.print
+(ns explojure.dataframe.print
   (import explojure.dataframe.core.DataFrame
           java.util.regex.Matcher)
   (require [explojure.dataframe.core :as df-core]
