@@ -17,6 +17,7 @@
   "The Tabular protocol represents tabular data.  (Rows and columns)."
 
   (colnames [this])
+  (rownames [this])
   (ncol [this])
   (nrow [this])
 
@@ -51,6 +52,7 @@
 
   ;; get simple attributes
   (colnames [this] colnames)
+  (rownames [this] rownames)
   (ncol [this] column-ct)
   (nrow [this] row-ct)
 
