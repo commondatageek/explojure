@@ -40,7 +40,10 @@
       [this col-spec row-spec])
 
   (add-col [this colname column]
-           [this col-map]))
+           [this col-map])
+
+  (rename-col [this old-colname new-colname]
+              [this rename-map]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -206,6 +209,23 @@
    [this col-map]
    (new-dataframe (util/vconcat colnames (keys col-map))
                   (util/vconcat columns (vals col-map))
+                  rownames))
+
+  (rename-col
+   [this old-colname new-colname]
+   (let [old-cn-idx (get colname-idx old-colname)]
+     (new-dataframe (assoc colnames old-cn-idx new-colname)
+                    columns
+                    rownames)))
+
+  (rename-col
+   [this rename-map]
+   (new-dataframe (reduce (fn [v [old-colname new-colname]]
+                            (let [old-cn-idx (get colname-idx old-colname)]
+                              (assoc v old-cn-idx new-colname)))
+                          colnames
+                          (seq rename-map))
+                  columns
                   rownames)))
 
 
