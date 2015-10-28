@@ -88,10 +88,11 @@
   ;; convert names to 0-based indices
   (lookup-names
    [this axis xs]
+   (assert (contains? #{:rows :cols} axis)
+           "lookup-names: axis must be either :rows or :cols")
    (let [index (case axis
                  :rows rowname-idx
-                 :cols colname-idx
-                 (throw (new Exception "axis must be :rows or :cols")))]
+                 :cols colname-idx)]
      (if (sequential? xs)
        (util/vmap #(get index %) xs)
        (get index xs))))
@@ -122,11 +123,25 @@
   ;; select
   (select-cols-by-index
    [this cols]
+   (assert (sequential? cols)
+           "select-cols-by-index: column indices must be supplied in a sequential collection.")
+   (assert (every? integer? cols)
+           "select-cols-by-index: supplied column indices must be integers.")
+   (assert (every? #(not (neg? %)) cols)
+           "select-cols-by-index: negative column indices not allowed.")
+   
    (new-dataframe (util/vmap colnames cols)
                   (util/vmap columns cols)
                   rownames))
   (select-rows-by-index
    [this rows]
+   (assert (sequential? rows)
+           "select-rows-by-index: row indices must be supplied in a sequential collection.")
+   (assert (every? integer? rows)
+           "select-rows-by-index: supplied row indices must be integers.")
+   (assert (every? #(not (neg? %)) rows)
+           "select-rows-by-index: negative row indices not allowed.")
+
    (new-dataframe colnames
                   (apply vector
                          (for [c columns]
@@ -171,14 +186,31 @@
        (first (first (col-vectors filtered))))))
 
   ;; drop
+  ;; TODO: The dropping mechanism in these two functions
+  ;;   might be more efficient if we used (remove) instead of
+  ;;   our (filter #(not (drop-set %)).
   (drop-cols-by-index
    [this cols]
+   (assert (sequential? cols)
+           "drop-cols-by-index: column indices must be supplied in a sequential collection.")
+   (assert (every? integer? cols)
+           "drop-cols-by-index: supplied column indices must be integers.")
+   (assert (every? #(not (neg? %)) cols)
+           "drop-cols-by-index: negative column indices not allowed.")
+   
    (let [drop-set (set cols)]
      (select-cols-by-index this
                            (util/vfilter #(not (drop-set %))
                                          (util/vrange column-ct)))))
   (drop-rows-by-index
    [this rows]
+   (assert (sequential? rows)
+           "drop-rows-by-index: row indices must be supplied in a sequential collection.")
+   (assert (every? integer? rows)
+           "drop-rows-by-index: supplied row indices must be integers.")
+   (assert (every? #(not (neg? %)) rows)
+           "drop-rows-by-index: negative row indices not allowed.")
+   
    (let [drop-set (set rows)]
      (select-rows-by-index this
                            (util/vfilter #(not (drop-set %))
@@ -344,6 +376,8 @@
                  (vec (util/filter-ab (map not (map boolean n))
                                       names))))))))
 
+;; TODO: This conditional code looks brittle to me.
+;;   Think about if there is a better way to do this.
 (defn interpret-spec [df axis spec]
   (cond
     ;; handle nils
