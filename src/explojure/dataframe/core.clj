@@ -248,6 +248,8 @@
 
   (rename-col
    [this old-colname new-colname]
+   (assert (contains? colname-idx old-colname)
+           (str "rename-col: Cannot replace a column that doesn't exist (" old-colname ")."))
    (let [old-cn-idx (get colname-idx old-colname)]
      (new-dataframe (assoc colnames old-cn-idx new-colname)
                     columns
@@ -255,6 +257,10 @@
 
   (rename-col
    [this rename-map]
+   (let [non-cols (util/vfilter #(not (contains? colname-idx %))
+                                (keys rename-map))]
+     (assert (= (count non-cols) 0)
+             (str "rename-col: Cannot rename columns that don't exist: " non-cols)))
    (new-dataframe (reduce (fn [v [old-colname new-colname]]
                             (let [old-cn-idx (get colname-idx old-colname)]
                               (assoc v old-cn-idx new-colname)))
