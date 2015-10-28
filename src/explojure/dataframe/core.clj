@@ -40,7 +40,7 @@
       [this col-spec row-spec])
 
   (add-col [this colname column]
-           [this col-map])
+           [this add-mp])
 
   (rename-col [this old-colname new-colname]
               [this rename-map])
@@ -48,6 +48,9 @@
   (replace-col [this colname column]
                [this replace-map])
 
+  (set-col [this colname column]
+              [this set-map])
+  
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames]))
 
@@ -244,9 +247,11 @@
                   (conj columns column)
                   rownames))
   (add-col
-   [this col-map]
-   (new-dataframe (util/vconcat colnames (keys col-map))
-                  (util/vconcat columns (vals col-map))
+   [this add-map]
+   (assert (associative? add-map)
+           (str "add-col: add-map must be associative. (Received " (type add-map) ".)"))
+   (new-dataframe (util/vconcat colnames (keys add-map))
+                  (util/vconcat columns (vals add-map))
                   rownames))
 
   (rename-col
@@ -260,6 +265,8 @@
 
   (rename-col
    [this rename-map]
+   (assert (associative? rename-map)
+           (str "rename-col: rename-map must be associative. (Received " (type rename-map) ".)"))
    (let [non-cols (util/vfilter #(not (contains? colname-idx %))
                                 (keys rename-map))]
      (assert (= (count non-cols) 0)
@@ -282,6 +289,8 @@
 
   (replace-col
    [this replace-map]
+   (assert (associative? replace-map)
+           (str "replace-col: replace-map must be associative. (Received " (type replace-map) ".)"))
    (let [non-cols (util/vfilter #(not (contains? colname-idx %))
                                 (keys replace-map))]
      (assert (= (count non-cols) 0)
@@ -293,6 +302,21 @@
                           columns
                           (seq replace-map))
                   rownames))
+
+  (set-col
+   [this colname column]
+   (if (contains? colname-idx colname)
+     (replace-col this colname column)
+     (add-col this colname column)))
+
+  (set-col
+   [this set-map]
+   (assert (associative? set-map)
+           (str "set-col: set-map must be associative. (Received " (type set-map) ".)"))
+   (reduce (fn [df [colname column]]
+             (set-col df colname column))
+           this
+           (seq set-map)))
 
   (set-colnames
    [this new-colnames]
