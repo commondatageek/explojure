@@ -1,5 +1,5 @@
 (ns explojure.io
-  (require [explojure.dataframe :as dataframe]
+  (require [explojure.dataframe.core :as dataframe]
            [explojure.util :as util]
 
            [clojure.data.csv :as csv]
@@ -46,8 +46,8 @@
 
 (defn write-csv [df f]
   (with-open [writer (io/writer f)]
-    (let [header (dataframe/$colnames df)
-          rows (dataframe/$rows df)]
+    (let [header (dataframe/colnames df)
+          rows (dataframe/row-vectors df)]
       (csv/write-csv writer (concat [header] rows)))))
 
 
@@ -71,7 +71,7 @@
                        (map vec
                             (mapv #(sequence types-xf %) output-cols))))]
        (dataframe/new-dataframe (vec headers)
-                                (apply hash-map (interleave headers columns)))))))
+                                (vec columns))))))
 
 
 (defn read-csv-lazy
@@ -98,5 +98,5 @@
                      cols))
                  (rest rows))
           (dataframe/new-dataframe headers
-                                   (apply hash-map (interleave headers cols))))))))
+                                   (vec cols)))))))
 
