@@ -130,7 +130,7 @@
                   (apply vector
                          (for [c columns]
                            (util/vmap c rows)))
-                  rownames))
+                  (util/vmap rownames rows)))
   ($
    [this col-spec]
    ($ this col-spec nil))
