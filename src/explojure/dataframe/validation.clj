@@ -84,10 +84,14 @@
                     "All columns must have the same length.")
   
   ;; colnames must have same length as columns
-  (ensure-equal (count colnames)
-                (count columns)
-                "There must be a 1:1 correspondence of columns to column names.")
-
+  (let [cn-ct (count colnames)
+        c-ct (count columns)]
+    (ensure-equal cn-ct
+                  c-ct
+                  (str "colnames argument must have same length (" cn-ct ")"
+                       " as number of columns (" c-ct ").")))
+  
+  
   ;; all colnames must be the same type
   (ensure-all-equal (map type colnames)
                     "All colnames must have the same type.")
@@ -116,10 +120,13 @@
                "rownames argument must be a vector")
 
   ;; rownames must equal row-ct
-  (ensure-equal (count rownames)
-                row-ct
-                "rownames argument must have same length as columns")
-
+  (let [rn-ct (count rownames)]
+    (ensure-equal rn-ct
+                  row-ct
+                  (str "rownames argument must have same length (" rn-ct ")"
+                       " as number of rows (" row-ct ").")))
+  
+  
   ;; rownames must all be unique
   (ensure-unique rownames
                  "rownames must be unique.")
