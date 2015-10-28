@@ -48,6 +48,9 @@
   (replace-col [this colname column]
                [this replace-map])
 
+  (set-col [this colname column]
+              [this set-map])
+  
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames]))
 
@@ -293,6 +296,19 @@
                           columns
                           (seq replace-map))
                   rownames))
+
+  (set-col
+   [this colname column]
+   (if (contains? colname-idx colname)
+     (replace-col this colname column)
+     (add-col this colname column)))
+
+  (set-col
+   [this set-map]
+   (reduce (fn [df [colname column]]
+             (set-col df colname column))
+           this
+           (seq set-map)))
 
   (set-colnames
    [this new-colnames]
