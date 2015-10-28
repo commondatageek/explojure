@@ -45,7 +45,8 @@
   (rename-col [this old-colname new-colname]
               [this rename-map])
 
-  (set-colnames [this new-colnames]))
+  (set-colnames [this new-colnames])
+  (set-rownames [this new-rownames]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -234,7 +235,13 @@
    [this new-colnames]
    (new-dataframe new-colnames
                   columns
-                  rownames)))
+                  rownames))
+
+  (set-rownames
+   [this new-rownames]
+   (new-dataframe colnames
+                  columns
+                  new-rownames)))
 
 
 
