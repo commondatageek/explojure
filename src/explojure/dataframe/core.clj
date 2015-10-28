@@ -45,6 +45,9 @@
   (rename-col [this old-colname new-colname]
               [this rename-map])
 
+  (replace-col [this colname column]
+               [this replace-map])
+
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames]))
 
@@ -269,6 +272,28 @@
                   columns
                   rownames))
 
+  (replace-col
+   [this colname column]
+   (assert (contains? colname-idx colname)
+           (str "replace-col: Cannot replace a column that doesn't exist (" colname ")."))
+   (let [cn-idx (get colname-idx colname)]
+     (new-dataframe colnames
+                    (assoc columns cn-idx column))))
+
+  (replace-col
+   [this replace-map]
+   (let [non-cols (util/vfilter #(not (contains? colname-idx %))
+                                (keys replace-map))]
+     (assert (= (count non-cols) 0)
+             (str "replace-col: Cannot replace columns that don't exist: " non-cols)))
+   (new-dataframe colnames
+                  (reduce (fn [v [colname new-column]]
+                            (let [cn-idx (get colname-idx colname)]
+                              (assoc v cn-idx new-column)))
+                          columns
+                          (seq replace-map))
+                  rownames))
+
   (set-colnames
    [this new-colnames]
    (new-dataframe new-colnames
@@ -408,5 +433,3 @@
         (util/boolean? f)             (interpret-bool-spec df axis spec)
         (or (string? f) (keyword? f)) (interpret-name-spec df axis spec)
         :else (throw (new Exception (str "Specifiers must be nil, [], fn, integer, boolean, string, or keyword. Received " (type f))))))))
-
-
