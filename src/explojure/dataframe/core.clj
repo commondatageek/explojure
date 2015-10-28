@@ -40,7 +40,7 @@
       [this col-spec row-spec])
 
   (add-col [this colname column]
-           [this add-mp])
+           [this add-map])
 
   (rename-col [this old-colname new-colname]
               [this rename-map])
@@ -49,7 +49,7 @@
                [this replace-map])
 
   (set-col [this colname column]
-              [this set-map])
+           [this set-map])
   
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames]))
