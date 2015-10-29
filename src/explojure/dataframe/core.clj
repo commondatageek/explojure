@@ -13,6 +13,28 @@
       (nil? x)
       (fn? x)))
 
+(defn nil-cols [ncol nrow]
+  (->> nil
+       (util/vrepeat nrow)
+       (util/vrepeat ncol)))
+
+(defn venn-components [left right]
+  (let [left-set (set left)
+        right-set (set right)
+        [left-only in-common] (reduce (fn [[left-only in-common] val]
+                                        (if (nil? (get right-set val))
+                                          [(conj left-only val) in-common]
+                                          [left-only (conj in-common val)]))
+                                      [[] []]
+                                      left)
+        right-only (reduce (fn [right-only val]
+                             (if (nil? (get left-set val))
+                               (conj right-only val)
+                               right-only))
+                           []
+                           right)]
+    [left-only in-common right-only]))
+
 (defprotocol Tabular
   "The Tabular protocol represents tabular data.  (Rows and columns)."
   (colnames [this])
@@ -348,39 +370,25 @@
              (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge) if appropriate."))
 
      (if align-rownames
+       ;; if both DFs have rownames
        (let [left-rownames (explojure.dataframe.core/rownames this)
              right-rownames (explojure.dataframe.core/rownames right)
 
-             [left-only in-common] (reduce (fn [[left-only in-common] r]
-                                             (if (nil? (lookup-names right :rows r))
-                                               [(conj left-only r) in-common]
-                                               [left-only (conj in-common r)]))
-                                           [[] []]
-                                           left-rownames)
-
-             right-only (reduce (fn [right-only r]
-                                  (if (nil? (lookup-names this :rows r))
-                                    (conj right-only r)
-                                    right-only))
-                                []
-                                right-rownames)
-
-             combined-colnames (util/vconcat (explojure.dataframe.core/colnames this)
-                                             (explojure.dataframe.core/colnames right))
+             [left-only in-common right-only] (venn-components left-rownames
+                                                               right-rownames)
 
              combined-left-only (util/vconcat (col-vectors ($ this nil left-only))
-                                              (util/vrepeat (ncol right)
-                                                            (util/vrepeat (count left-only)
-                                                                          nil)))
+                                              (nil-cols (ncol right) (count left-only)))
 
              combined-in-common (util/vconcat (col-vectors ($ this nil in-common))
                                               (col-vectors ($ right nil in-common)))
 
-             combined-right-only (util/vconcat (util/vrepeat (ncol this)
-                                                             (util/vrepeat (count right-only)
-                                                                           nil))
+             combined-right-only (util/vconcat (nil-cols (ncol this) (count right-only))
                                                (col-vectors ($ right nil right-only)))
              
+             combined-colnames (util/vconcat (explojure.dataframe.core/colnames this)
+                                             (explojure.dataframe.core/colnames right))
+
              combined-columns (util/vmap util/vflatten
                                          (util/vmap vector
                                                     combined-left-only
@@ -391,6 +399,8 @@
          (new-dataframe combined-colnames
                         combined-columns
                         combined-rownames))
+
+       ;; if one or none of the DFs have rownames
        (let [combined-colnames (util/vconcat (explojure.dataframe.core/colnames this)
                                              (explojure.dataframe.core/colnames right))
 
@@ -398,7 +408,7 @@
                                             (col-vectors right))
 
              ;; at this point we know it is not true that both DFs have rownames
-             ;; so use the one that has them
+             ;; so use the one that has them.  Or nil if neither has them.
              use-rownames (if (explojure.dataframe.core/rownames this)
                             (explojure.dataframe.core/rownames this)
                             (explojure.dataframe.core/rownames right))]
