@@ -349,6 +349,10 @@ primarily for side effects."
   "Like flatten, but ensure vector output."
   (vec (apply flatten args)))
 
+(defn vrepeat [& args]
+  "Like repeat, but ensure vector output"
+  (vec (apply repeat args)))
+
 (defn M
   "Shorthand for getting metadata from an object."
   ([x key]
