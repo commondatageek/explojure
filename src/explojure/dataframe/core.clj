@@ -436,53 +436,53 @@
                         use-rownames)))))
 
   (conj-rows
-   [this right]
-   (let [left-rownames (explojure.dataframe.core/rownames this)
-         right-rownames (explojure.dataframe.core/rownames right)
+   [this bottom]
+   (let [top-rownames (explojure.dataframe.core/rownames this)
+         bottom-rownames (explojure.dataframe.core/rownames bottom)
 
-         left-has-rownames (not (nil? left-rownames))
-         right-has-rownames (not (nil? right-rownames))
+         top-has-rownames (not (nil? top-rownames))
+         bottom-has-rownames (not (nil? bottom-rownames))
 
-         both-have-rownames (and left-has-rownames
-                                 right-has-rownames)
-         both-no-rownames (and (not left-has-rownames)
-                               (not right-has-rownames))
+         both-have-rownames (and top-has-rownames
+                                 bottom-has-rownames)
+         both-no-rownames (and (not top-has-rownames)
+                               (not bottom-has-rownames))
          
-         rowname-conflicts (s/intersection (set left-rownames)
-                                           (set right-rownames))]
+         rowname-conflicts (s/intersection (set top-rownames)
+                                           (set bottom-rownames))]
      
      (assert (or both-have-rownames both-no-rownames)
              (str "conj-rows: DataFrames must both have rownames, or they must both not have rownames in order to maintain the integrity of rowname semantics."))
      (assert (= (count rowname-conflicts) 0)
              (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge) if appropriate."))
 
-       (let [left-colnames (explojure.dataframe.core/colnames this)
-             right-colnames (explojure.dataframe.core/colnames right)
+       (let [top-colnames (explojure.dataframe.core/colnames this)
+             bottom-colnames (explojure.dataframe.core/colnames bottom)
 
-             [left-only in-common right-only] (venn-three-components left-colnames
-                                                                     right-colnames)
-             cmb-colnames (util/vconcat left-only in-common right-only)
+             [top-only in-common bottom-only] (venn-three-components top-colnames
+                                                                     bottom-colnames)
+             cmb-colnames (util/vconcat top-only in-common bottom-only)
              
              cmb-columns (cmb-cols-vt
-                          (cmb-cols-hr (col-vectors ($ this left-only nil))
+                          (cmb-cols-hr (col-vectors ($ this top-only nil))
                                            (col-vectors ($ this in-common nil))
-                                           (nil-cols (count right-only)
+                                           (nil-cols (count bottom-only)
                                                      (nrow this)))
-                          (cmb-cols-hr (nil-cols (count left-only)
-                                                     (nrow right))
-                                           (col-vectors ($ right in-common nil))
-                                           (col-vectors ($ right right-only nil))))
+                          (cmb-cols-hr (nil-cols (count top-only)
+                                                     (nrow bottom))
+                                           (col-vectors ($ bottom in-common nil))
+                                           (col-vectors ($ bottom bottom-only nil))))
              
              cmb-rownames (if both-have-rownames
-                            (util/vconcat left-rownames
-                                          right-rownames)
+                            (util/vconcat top-rownames
+                                          bottom-rownames)
                             nil)
 
-             [left-and-common right-only] (venn-two-components left-colnames right-colnames)]
+             [top-and-common bottom-only] (venn-two-components top-colnames bottom-colnames)]
          ($ (new-dataframe cmb-colnames
                            cmb-columns
                            cmb-rownames)
-            (concat left-and-common right-only)
+            (concat top-and-common bottom-only)
             nil)))))
 
 (defn new-dataframe
