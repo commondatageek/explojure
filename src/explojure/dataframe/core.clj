@@ -380,45 +380,39 @@
 
   (conj-cols
    [this right]
-   (let [colname-conflicts (s/intersection (set (explojure.dataframe.core/colnames this))
-                                           (set (explojure.dataframe.core/colnames right)))
+   (let [left-colnames (explojure.dataframe.core/colnames this)
+         right-colnames (explojure.dataframe.core/colnames right)
+         left-rownames (explojure.dataframe.core/rownames this)
+         right-rownames (explojure.dataframe.core/rownames right)
+         
+         colname-conflicts (s/intersection (set left-colnames)
+                                           (set right-colnames))
          equal-nrow (= (nrow this)
                        (nrow right))
 
-         left-has-rownames (not (nil? (explojure.dataframe.core/rownames this)))
-         right-has-rownames (not (nil? (explojure.dataframe.core/rownames right)))
+         left-has-rownames (not (nil? left-rownames))
+         right-has-rownames (not (nil? right-rownames))
          
          align-rownames (and left-has-rownames
                              right-has-rownames)]
      
      (assert (= (count colname-conflicts) 0)
              (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge) if appropriate."))
-
+     
      (if align-rownames
        ;; if both DFs have rownames
-       (let [left-rownames (explojure.dataframe.core/rownames this)
-             right-rownames (explojure.dataframe.core/rownames right)
-
-             [left-only in-common right-only] (venn-three-components left-rownames
-                                                               right-rownames)
-
-             combined-left-only (util/vconcat (col-vectors ($ this nil left-only))
-                                              (nil-cols (ncol right) (count left-only)))
-
-             combined-in-common (util/vconcat (col-vectors ($ this nil in-common))
-                                              (col-vectors ($ right nil in-common)))
-
-             combined-right-only (util/vconcat (nil-cols (ncol this) (count right-only))
-                                               (col-vectors ($ right nil right-only)))
+       (let [[left-only in-common right-only] (venn-three-components left-rownames
+                                                                     right-rownames)
              
-             combined-colnames (util/vconcat (explojure.dataframe.core/colnames this)
-                                             (explojure.dataframe.core/colnames right))
+             combined-colnames (util/vconcat left-colnames
+                                             right-colnames)
 
-             combined-columns (util/vmap util/vflatten
-                                         (util/vmap vector
-                                                    combined-left-only
-                                                    combined-in-common
-                                                    combined-right-only))
+             combined-columns (cmb-cols-vt (cmb-cols-hr (col-vectors ($ this nil left-only))
+                                                        (nil-cols (ncol right) (count left-only)))
+                                           (cmb-cols-hr (col-vectors ($ this nil in-common))
+                                                        (col-vectors ($ right nil in-common)))
+                                           (cmb-cols-hr (nil-cols (ncol this) (count right-only))
+                                                        (col-vectors ($ right nil right-only))))
              
              combined-rownames (util/vconcat left-only in-common right-only)]
          (new-dataframe combined-colnames
@@ -440,7 +434,6 @@
          (new-dataframe combined-colnames
                         combined-columns
                         use-rownames)))))
-
 
   (conj-rows
    [this right]
