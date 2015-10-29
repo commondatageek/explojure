@@ -1,8 +1,8 @@
 (ns explojure.dataframe.core
-     (:require [explojure.dataframe.validation :as valid]
-               [explojure.util :as util]
-               [clojure.set :as s]
-               [clojure.test :as t]))
+  (:require [explojure.dataframe.validation :as valid]
+            [explojure.util :as util]
+            [clojure.set :as s]
+            [clojure.test :as t]))
 
 ;; Placeholder to allow compilation.
 (declare new-dataframe)
@@ -18,7 +18,11 @@
        (util/vrepeat nrow)
        (util/vrepeat ncol)))
 
-(defn venn-components [left right]
+(defn venn-three-components
+  "  Provide left-only, in-common, and right-only components of left and right sets.
+  In left-only and right-only components, preserve order from left and right.
+  For in-common, use left order."
+  [left right]
   (let [left-set (set left)
         right-set (set right)
         [left-only in-common] (reduce (fn [[left-only in-common] val]
@@ -34,6 +38,26 @@
                            []
                            right)]
     [left-only in-common right-only]))
+
+(defn venn-two-components
+  "Provide left-and-common and right-only components of left and right sets.
+  Preserve left and right orders."
+  [left right]
+  (let [left-set (set left)
+        right-only (reduce (fn [right-only val]
+                             (if (nil? (get left-set val))
+                               (conj right-only val)
+                               right-only))
+                           []
+                           right)]
+    [left right-only]))
+
+(defn cmb-cols-vt [& args]
+  (util/vmap util/vflatten
+             (apply util/vmap vector args)))
+
+(defn cmb-cols-hr [& args]
+  (apply util/vconcat args))
 
 (defprotocol Tabular
   "The Tabular protocol represents tabular data.  (Rows and columns)."
@@ -75,7 +99,8 @@
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames])
 
-  (conj-cols [this right]))
+  (conj-cols [this right])
+  (conj-rows [this right]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -374,7 +399,7 @@
        (let [left-rownames (explojure.dataframe.core/rownames this)
              right-rownames (explojure.dataframe.core/rownames right)
 
-             [left-only in-common right-only] (venn-components left-rownames
+             [left-only in-common right-only] (venn-three-components left-rownames
                                                                right-rownames)
 
              combined-left-only (util/vconcat (col-vectors ($ this nil left-only))
@@ -414,7 +439,58 @@
                             (explojure.dataframe.core/rownames right))]
          (new-dataframe combined-colnames
                         combined-columns
-                        use-rownames))))))
+                        use-rownames)))))
+
+
+  (conj-rows
+   [this right]
+   (let [left-rownames (explojure.dataframe.core/rownames this)
+         right-rownames (explojure.dataframe.core/rownames right)
+
+         left-has-rownames (not (nil? left-rownames))
+         right-has-rownames (not (nil? right-rownames))
+
+         both-have-rownames (and left-has-rownames
+                                 right-has-rownames)
+         both-no-rownames (and (not left-has-rownames)
+                               (not right-has-rownames))
+         
+         rowname-conflicts (s/intersection (set left-rownames)
+                                           (set right-rownames))]
+     
+     (assert (or both-have-rownames both-no-rownames)
+             (str "conj-rows: DataFrames must both have rownames, or they must both not have rownames in order to maintain the integrity of rowname semantics."))
+     (assert (= (count rowname-conflicts) 0)
+             (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge) if appropriate."))
+
+       (let [left-colnames (explojure.dataframe.core/colnames this)
+             right-colnames (explojure.dataframe.core/colnames right)
+
+             [left-only in-common right-only] (venn-three-components left-colnames
+                                                                     right-colnames)
+             cmb-colnames (util/vconcat left-only in-common right-only)
+             
+             cmb-columns (cmb-cols-vt
+                          (cmb-cols-hr (col-vectors ($ this left-only nil))
+                                           (col-vectors ($ this in-common nil))
+                                           (nil-cols (count right-only)
+                                                     (nrow this)))
+                          (cmb-cols-hr (nil-cols (count left-only)
+                                                     (nrow right))
+                                           (col-vectors ($ right in-common nil))
+                                           (col-vectors ($ right right-only nil))))
+             
+             cmb-rownames (if both-have-rownames
+                            (util/vconcat left-rownames
+                                          right-rownames)
+                            nil)
+
+             [left-and-common right-only] (venn-two-components left-colnames right-colnames)]
+         ($ (new-dataframe cmb-colnames
+                           cmb-columns
+                           cmb-rownames)
+            (concat left-and-common right-only)
+            nil)))))
 
 (defn new-dataframe
   ([cols vecs]
