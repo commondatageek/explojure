@@ -111,12 +111,12 @@ realized after the first pass."
   [coll]
   (filter-ab coll (range (count coll))))
 
-(defn round-robin
+(defn cart-prod
   "
   Given two collections, xs and ys, return a lazy seq of vectors where
   each vector is one of all possible unique permutations of x and y.
 
-  For example, (round-robin [1 2 3] [\"a\" \"b\"]) yields:
+  For example, (cart-prod [1 2 3] [\"a\" \"b\"]) yields:
     ([1 \"a\"] [1 \"b\"] [2 \"a\"] [2 \"b\"] [3 \"a\"] [3 \"b\"])
   "
   [xs ys]
