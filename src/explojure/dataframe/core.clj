@@ -77,6 +77,8 @@
   (nrow [this])
   (not-nil [this])
 
+  (equal? [this other])
+
   (lookup-names [this axis xs])
 
   (col-vectors [this])
@@ -149,6 +151,14 @@
                                   (filter identity
                                           (map #(not (nil? %))
                                                c)))))]))
+
+  (equal?
+   [this other]
+   "  Uses colnames, columns, and rownames as the basis for equality
+  comparison with another DataFrame."
+   (and (= colnames (explojure.dataframe.core/colnames other))
+        (= rownames (explojure.dataframe.core/rownames other))
+        (= columns (vec (col-vectors other)))))
 
   ;; convert names to 0-based indices
   (lookup-names
