@@ -18,39 +18,28 @@
        (util/vrepeat nrow)
        (util/vrepeat ncol)))
 
-(defn venn-three-components
-  "  Provide left-only, in-common, and right-only components of left and right sets.
-  In left-only and right-only components, preserve order from left and right.
-  For in-common, use left order."
-  [left right]
+(defn venn-components [left right]
+  "Provide left-only, in-common, left-and-common, and right-only components of
+   left and right sets. In left-only and right-only components, preserve order
+   from left and right.  For in-common, use left order."
   (let [left-set (set left)
         right-set (set right)
-        [left-only in-common] (reduce (fn [[left-only in-common] val]
-                                        (if (nil? (get right-set val))
-                                          [(conj left-only val) in-common]
-                                          [left-only (conj in-common val)]))
-                                      [[] []]
-                                      left)
-        right-only (reduce (fn [right-only val]
-                             (if (nil? (get left-set val))
-                               (conj right-only val)
-                               right-only))
-                           []
-                           right)]
-    [left-only in-common right-only]))
 
-(defn venn-two-components
-  "Provide left-and-common and right-only components of left and right sets.
-  Preserve left and right orders."
-  [left right]
-  (let [left-set (set left)
+        [left-only in-common left-and-common]
+        (reduce (fn [[left-only in-common left-and-common] val]
+                  (if (nil? (get right-set val))
+                    [(conj left-only val) in-common (conj left-and-common val)]
+                    [left-only (conj in-common val) (conj left-and-common val)]))
+                [[] [] []]
+                left)
+
         right-only (reduce (fn [right-only val]
                              (if (nil? (get left-set val))
                                (conj right-only val)
                                right-only))
                            []
                            right)]
-    [left right-only]))
+    [left-only in-common left-and-common right-only])  )
 
 (defn cmb-cols-vt [& args]
   (util/vmap util/vflatten
@@ -58,6 +47,27 @@
 
 (defn cmb-cols-hr [& args]
   (apply util/vconcat args))
+
+(defn collate-keyvals [keyvals]
+  (reduce (fn [m [k v]]
+            (assoc m k (conj (get m k []) v)))
+          {}
+          keyvals))
+
+(def conflict-resolution-strategies
+  {;; always return left value
+   :left (fn [_ _ left _] left)
+
+   ;; always return right value
+   :right (fn [_ _ _ right] right)
+
+   ;; return left value if not nil; else right; else nil
+   :left-not-nil (fn [_ _ left right]
+                   (if left left right))
+
+   ;; return right value if not nil; else left; else nil
+   :right-not-nil (fn [_ _ left right]
+                    (if right right left))})
 
 (defprotocol Tabular
   "The Tabular protocol represents tabular data.  (Rows and columns)."
@@ -100,7 +110,8 @@
   (set-rownames [this new-rownames])
 
   (conj-cols [this right])
-  (conj-rows [this right]))
+  (conj-rows [this bottom])
+  (merge-frames [this other resolution-fn]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -177,30 +188,41 @@
   ;; select
   (select-cols-by-index
    [this cols]
-   (assert (sequential? cols)
-           "select-cols-by-index: column indices must be supplied in a sequential collection.")
-   (assert (every? integer? cols)
-           "select-cols-by-index: supplied column indices must be integers.")
-   (assert (every? #(not (neg? %)) cols)
-           "select-cols-by-index: negative column indices not allowed.")
-   
-   (new-dataframe (util/vmap colnames cols)
-                  (util/vmap columns cols)
-                  rownames))
+   (if (= (ncol this) 0)
+     this
+     (do
+       (assert (sequential? cols)
+               "select-cols-by-index: column indices must be supplied in a sequential collection.")
+       (assert (every? integer? cols)
+               "select-cols-by-index: supplied column indices must be integers.")
+       (assert (every? #(not (neg? %)) cols)
+               "select-cols-by-index: negative column indices not allowed.")
+       
+       (new-dataframe (util/vmap colnames cols)
+                      (util/vmap columns cols)
+                      (if (> (count cols) 0)
+                        rownames
+                        nil)))))
+  
   (select-rows-by-index
    [this rows]
-   (assert (sequential? rows)
-           "select-rows-by-index: row indices must be supplied in a sequential collection.")
-   (assert (every? integer? rows)
-           "select-rows-by-index: supplied row indices must be integers.")
-   (assert (every? #(not (neg? %)) rows)
-           "select-rows-by-index: negative row indices not allowed.")
-
-   (new-dataframe colnames
-                  (apply vector
-                         (for [c columns]
-                           (util/vmap c rows)))
-                  (util/vmap rownames rows)))
+   (if (= (nrow this) 0)
+     this
+     (do
+       (assert (sequential? rows)
+               "select-rows-by-index: row indices must be supplied in a sequential collection.")
+       (assert (every? integer? rows)
+               "select-rows-by-index: supplied row indices must be integers.")
+       (assert (every? #(not (neg? %)) rows)
+               "select-rows-by-index: negative row indices not allowed.")
+       
+       (new-dataframe colnames
+                      (apply vector
+                             (for [c columns]
+                               (util/vmap c rows)))
+                      (if (> (count rows) 0)
+                        (util/vmap rownames rows)
+                        nil)))))
   ($
    [this col-spec]
    ($ this col-spec nil))
@@ -245,30 +267,36 @@
   ;;   our (filter #(not (drop-set %)).
   (drop-cols-by-index
    [this cols]
-   (assert (sequential? cols)
-           "drop-cols-by-index: column indices must be supplied in a sequential collection.")
-   (assert (every? integer? cols)
-           "drop-cols-by-index: supplied column indices must be integers.")
-   (assert (every? #(not (neg? %)) cols)
-           "drop-cols-by-index: negative column indices not allowed.")
-   
-   (let [drop-set (set cols)]
-     (select-cols-by-index this
-                           (util/vfilter #(not (drop-set %))
-                                         (util/vrange column-ct)))))
+   (if (= (ncol this) 0)
+     this
+     (do
+       (assert (sequential? cols)
+               "drop-cols-by-index: column indices must be supplied in a sequential collection.")
+       (assert (every? integer? cols)
+               "drop-cols-by-index: supplied column indices must be integers.")
+       (assert (every? #(not (neg? %)) cols)
+               "drop-cols-by-index: negative column indices not allowed.")
+       
+       (let [drop-set (set cols)]
+         (select-cols-by-index this
+                               (util/vfilter #(not (drop-set %))
+                                             (util/vrange column-ct)))))))
   (drop-rows-by-index
    [this rows]
-   (assert (sequential? rows)
-           "drop-rows-by-index: row indices must be supplied in a sequential collection.")
-   (assert (every? integer? rows)
-           "drop-rows-by-index: supplied row indices must be integers.")
-   (assert (every? #(not (neg? %)) rows)
-           "drop-rows-by-index: negative row indices not allowed.")
-   
-   (let [drop-set (set rows)]
-     (select-rows-by-index this
-                           (util/vfilter #(not (drop-set %))
-                                         (util/vrange row-ct)))))
+   (if (= (nrow this) 0)
+     this
+     (do
+       (assert (sequential? rows)
+               "drop-rows-by-index: row indices must be supplied in a sequential collection.")
+       (assert (every? integer? rows)
+               "drop-rows-by-index: supplied row indices must be integers.")
+       (assert (every? #(not (neg? %)) rows)
+               "drop-rows-by-index: negative row indices not allowed.")
+       
+       (let [drop-set (set rows)]
+         (select-rows-by-index this
+                               (util/vfilter #(not (drop-set %))
+                                             (util/vrange row-ct)))))))
 
   ($-
    [this col-spec]
@@ -397,31 +425,36 @@
                              right-has-rownames)]
      
      (assert (= (count colname-conflicts) 0)
-             (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge) if appropriate."))
+             (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge-frames) if appropriate."))
      
      (if align-rownames
        ;; if both DFs have rownames
-       (let [[left-only in-common right-only] (venn-three-components left-rownames
-                                                                     right-rownames)
+       (let [[left-only in-common left-and-common right-only] (venn-components left-rownames
+                                                                               right-rownames)
              
-             combined-colnames (util/vconcat left-colnames
-                                             right-colnames)
+             combined-colnames
+             (util/vconcat left-colnames right-colnames)
 
-             combined-columns (cmb-cols-vt (cmb-cols-hr (col-vectors ($ this nil left-only))
-                                                        (nil-cols (ncol right) (count left-only)))
-                                           (cmb-cols-hr (col-vectors ($ this nil in-common))
-                                                        (col-vectors ($ right nil in-common)))
-                                           (cmb-cols-hr (nil-cols (ncol this) (count right-only))
-                                                        (col-vectors ($ right nil right-only))))
+             combined-columns
+             (cmb-cols-vt (cmb-cols-hr (col-vectors ($ this nil left-only))
+                                       (nil-cols (ncol right) (count left-only)))
+                          (cmb-cols-hr (col-vectors ($ this nil in-common))
+                                       (col-vectors ($ right nil in-common)))
+                          (cmb-cols-hr (nil-cols (ncol this) (count right-only))
+                                       (col-vectors ($ right nil right-only))))
              
-             combined-rownames (util/vconcat left-only in-common right-only)]
-         (new-dataframe combined-colnames
-                        combined-columns
-                        combined-rownames))
+             combined-rownames
+             (util/vconcat left-only in-common right-only)]
+         
+         ($ (new-dataframe combined-colnames
+                           combined-columns
+                           combined-rownames)
+            (concat left-and-common right-only)
+            nil))
 
        ;; if one or none of the DFs have rownames
-       (let [combined-colnames (util/vconcat (explojure.dataframe.core/colnames this)
-                                             (explojure.dataframe.core/colnames right))
+       (let [combined-colnames (util/vconcat left-colnames
+                                             right-colnames)
 
              combined-columns (util/vconcat (col-vectors this)
                                             (col-vectors right))
@@ -430,10 +463,15 @@
              ;; so use the one that has them.  Or nil if neither has them.
              use-rownames (if (explojure.dataframe.core/rownames this)
                             (explojure.dataframe.core/rownames this)
-                            (explojure.dataframe.core/rownames right))]
-         (new-dataframe combined-colnames
-                        combined-columns
-                        use-rownames)))))
+                            (explojure.dataframe.core/rownames right))
+
+             [left-only in-common left-and-common right-only] (venn-components left-colnames
+                                                                               right-colnames)]
+         ($ (new-dataframe combined-colnames
+                           combined-columns
+                           use-rownames)
+            (concat left-and-common right-only)
+            nil)))))
 
   (conj-rows
    [this bottom]
@@ -454,13 +492,13 @@
      (assert (or both-have-rownames both-no-rownames)
              (str "conj-rows: DataFrames must both have rownames, or they must both not have rownames in order to maintain the integrity of rowname semantics."))
      (assert (= (count rowname-conflicts) 0)
-             (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge) if appropriate."))
+             (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge-frames) if appropriate."))
 
        (let [top-colnames (explojure.dataframe.core/colnames this)
              bottom-colnames (explojure.dataframe.core/colnames bottom)
 
-             [top-only in-common bottom-only] (venn-three-components top-colnames
-                                                                     bottom-colnames)
+             [top-only in-common top-and-common bottom-only] (venn-components top-colnames
+                                                                              bottom-colnames)
              cmb-colnames (util/vconcat top-only in-common bottom-only)
              
              cmb-columns (cmb-cols-vt
@@ -476,14 +514,72 @@
              cmb-rownames (if both-have-rownames
                             (util/vconcat top-rownames
                                           bottom-rownames)
-                            nil)
-
-             [top-and-common bottom-only] (venn-two-components top-colnames bottom-colnames)]
+                            nil)]
+         
          ($ (new-dataframe cmb-colnames
                            cmb-columns
                            cmb-rownames)
             (concat top-and-common bottom-only)
-            nil)))))
+            nil))))
+
+  (merge-frames
+   [this right resolution-fn]
+   (let [left-colnames (explojure.dataframe.core/colnames this)
+         right-colnames (explojure.dataframe.core/colnames right)
+         left-rownames (explojure.dataframe.core/rownames this)
+         right-rownames (explojure.dataframe.core/rownames right)]
+
+     ;; some input validation
+     (assert (and left-colnames right-colnames
+                  left-rownames right-rownames)
+             (str "merge: both DataFrames must have both rownames and colnames:\n"
+                  "left colnames: " (if left-colnames "supplied" "missing") "\n"
+                  "left rownames: " (if left-rownames "supplied" "missing") "\n"
+                  "right colnames: " (if right-colnames "supplied" "missing") "\n"
+                  "right rownames: " (if right-rownames "supplied" "missing")))
+
+     (let [;; set components
+           [rn-left-only rn-in-common rn-left-and-common rn-right-only]
+           (venn-components left-rownames right-rownames)
+           [cn-left-only cn-in-common cn-left-and-common cn-right-only]
+           (venn-components left-colnames right-colnames)
+
+           ;; overlap / conflict
+           conflict-columns (for [c cn-in-common]
+                              [c rn-in-common])
+
+           ;; resolve conflicts
+           resolved (vec (for [[col rownames] conflict-columns]
+                           (util/vmap #(apply resolution-fn %)
+                                      (map vector
+                                           (repeat col)
+                                           rownames
+                                           ($ this col rownames)
+                                           ($ right col rownames)))))
+
+           combined-columns
+           (cmb-cols-vt
+            (cmb-cols-hr (col-vectors ($ this cn-left-only rn-left-only))
+                         (col-vectors ($ this cn-in-common rn-left-only))
+                         (nil-cols (count cn-right-only) (count rn-left-only)))
+            
+            (cmb-cols-hr (col-vectors ($ this cn-left-only rn-in-common))
+                         resolved
+                         (col-vectors ($ right cn-right-only rn-in-common)))
+            
+            (cmb-cols-hr (nil-cols (count cn-left-only) (count rn-right-only))
+                         (col-vectors ($ right cn-in-common rn-right-only))
+                         (col-vectors ($ right cn-right-only rn-right-only))))
+           
+           combined-colnames (util/vconcat cn-left-only cn-in-common cn-right-only)
+           
+           combined-rownames (util/vconcat rn-left-only rn-in-common rn-right-only)]
+       
+       ($ (new-dataframe combined-colnames
+                         combined-columns
+                         combined-rownames)
+          (concat cn-left-and-common cn-right-only)
+          (concat rn-left-and-common rn-right-only))))))
 
 (defn new-dataframe
   ([cols vecs]
@@ -610,3 +706,6 @@
         (util/boolean? f)             (interpret-bool-spec df axis spec)
         (or (string? f) (keyword? f)) (interpret-name-spec df axis spec)
         :else (throw (new Exception (str "Specifiers must be nil, [], fn, integer, boolean, string, or keyword. Received " (type f))))))))
+
+
+
