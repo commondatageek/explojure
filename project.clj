@@ -1,4 +1,4 @@
-(defproject explojure "0.3.0"
+(defproject explojure "0.4.0"
   :description "A simple, solid library for data munging in Clojure."
   :url "http://github.com/aaronj1331/explojure"
   :license {:name "Eclipse Public License"
