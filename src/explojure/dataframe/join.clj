@@ -1,5 +1,5 @@
-(ns explojure.join
-  (:require [explojure.dataframe :as df]
+(ns explojure.dataframe.join
+  (:require [explojure.dataframe.core :as df]
             [clojure.set :as set]))
 
 (defn gen-index [& cols]
@@ -64,8 +64,8 @@
            filtered-keys))
 
 (defn empty-df [colnames nrows]
-  (let [empty-col (vec (repeat nrows nil))]
-    (apply df/$df (interleave colnames (repeat empty-col)))))
+  (df/new-dataframe colnames
+                    (df/nil-cols (count colnames) nrows)))
 
 (defn avoid-collisions [l-join r-join l r]
   (let [l-non-join (set/difference (set l) (set l-join))
@@ -86,9 +86,17 @@
 (defn join
   ([left right on join-type] (join left right on on join-type))
   ([left right left-on right-on join-type]
+
+   ;; Right now we don't have a good way of dealing with dataframes that
+   ;; have rownames.  So don't allow it.
+   (assert (and (nil? (df/rownames left))
+                (nil? (df/rownames right)))
+           (str "join: Joining on dataframes that have rownames is currently unimplemented."))
+
+   ;; proceed
    (let [;; create index for key columns on left and right DFs
-         l-idx (apply gen-index (for [c left-on] (df/$col left c)))
-         r-idx (apply gen-index (for [c right-on] (df/$col right c)))
+         l-idx (apply gen-index (df/col-vectors (df/$ left left-on nil)))
+         r-idx (apply gen-index (df/col-vectors (df/$ right right-on nil)))
 
          ;; choose the row indices to draw from each DF
          [left-only
@@ -98,37 +106,42 @@
                                    (filter-keys l-idx r-idx join-type))
 
          ;; column names in the DFs
-         left-cols (df/$colnames left)
-         right-cols (df/$colnames right)
+         left-cols (df/colnames left)
+         right-cols (df/colnames right)
 
          ;; intersect join columns
          common-join-cols (set/intersection (set left-on) (set right-on))
 
          ;; get the appropriate rows from each DF
-         ri-rows (df/$ right right-inner right-cols)
+         ri-rows (df/$ right right-cols right-inner)
          re-rows (empty-df right-cols (count left-only))
-         ro-rows (df/$ right right-only right-cols)
+         ro-rows (df/$ right right-cols right-only)
 
-         li-rows (df/$ left left-inner left-cols)
-         lo-rows (df/$ left left-only left-cols)
+         li-rows (df/$ left left-cols left-inner)
+         lo-rows (df/$ left left-cols left-only)
 
          ;; left-empty frame is special because we need to
          ;; grab the keys from the corresponding right-only
          ;; data frame
-         le-rows (df/$conj-cols (-> ro-rows
-                                      (df/$col right-on)
-                                      (df/$rename-cols (zipmap right-on left-on)))
-                                  (empty-df (remove #(contains? (set left-on) %)
-                                                    left-cols)
-                                            (count right-only)))
+         le-rows (df/conj-cols (as-> ro-rows x
+                                 (df/col-vectors (df/$ x right-on nil))
+                                 (df/rename-col x (zipmap right-on left-on)))
+                               (empty-df (remove #(contains? (set left-on) %)
+                                                 left-cols)
+                                         (count right-only)))
 
-
+         
          ;; combine the rows for each side
-         left-side (reduce df/$conj-rows [li-rows lo-rows le-rows])
-         right-side (reduce df/$conj-rows [ri-rows re-rows ro-rows])
+         left-side (reduce df/conj-rows [li-rows lo-rows le-rows])
+         right-side (reduce df/conj-rows [ri-rows re-rows ro-rows])
 
          ;; avoid column name collisions with _x and _y
-         [left-repl right-repl] (avoid-collisions left-on right-on left-cols right-cols)]
-     (df/$conj-cols (df/$rename-cols left-side left-repl)
-                      (df/$remove-cols (df/$rename-cols right-side right-repl)
-                                         common-join-cols)))))
+         [left-repl right-repl] (avoid-collisions left-on
+                                                  right-on
+                                                  left-cols
+                                                  right-cols)]
+     
+     (df/conj-cols (df/rename-col left-side left-repl)
+                   (df/$- (df/rename-col right-side right-repl)
+                          common-join-cols
+                          nil)))))

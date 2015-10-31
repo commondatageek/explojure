@@ -1,5 +1,6 @@
 (ns explojure.dataframe.core
   (:require [explojure.dataframe.validation :as valid]
+            [explojure.dataframe.join :as join]            
             [explojure.util :as util]
             [clojure.set :as s]
             [clojure.test :as t]))
@@ -111,9 +112,12 @@
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames])
 
+  ;; combine dataframes
   (conj-cols [this right])
   (conj-rows [this bottom])
-  (merge-frames [this other resolution-fn]))
+  (merge-frames [this other resolution-fn])
+  (join-frames [this right on join-type]
+               [this right left-on right-on join-type]))
 
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
@@ -589,7 +593,15 @@
                          combined-columns
                          combined-rownames)
           (concat cn-left-and-common cn-right-only)
-          (concat rn-left-and-common rn-right-only))))))
+          (concat rn-left-and-common rn-right-only)))))
+
+  (join-frames
+   [this right on join-type]
+   (join-frames this right on on join-type))
+
+  (join-frames
+   [this right left-on right-on join-type]
+   (join/join this right left-on right-on join-type)))
 
 (defn new-dataframe
   ([cols vecs]
