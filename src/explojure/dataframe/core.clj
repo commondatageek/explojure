@@ -1,46 +1,15 @@
 (ns explojure.dataframe.core
-  (:require [explojure.dataframe.validation :as valid]
-            [explojure.dataframe.join :as join]            
+  (:require [explojure.dataframe.join :as join]
+            [explojure.dataframe.util :as dfu]
+            [explojure.dataframe.specifiers :as spec]
+            [explojure.dataframe.validation :as valid]
             [explojure.util :as util]
+            
             [clojure.set :as s]
             [clojure.test :as t]))
 
 ;; Placeholder to allow compilation.
 (declare new-dataframe)
-(declare interpret-spec)
-
-(defn multi-selector? [x]
-  (or (sequential? x)
-      (nil? x)
-      (fn? x)))
-
-(defn nil-cols [ncol nrow]
-  (->> nil
-       (util/vrepeat nrow)
-       (util/vrepeat ncol)))
-
-(defn venn-components [left right]
-  "Provide left-only, in-common, left-and-common, and right-only components of
-   left and right sets. In left-only and right-only components, preserve order
-   from left and right.  For in-common, use left order."
-  (let [left-set (set left)
-        right-set (set right)
-
-        [left-only in-common left-and-common]
-        (reduce (fn [[left-only in-common left-and-common] val]
-                  (if (nil? (get right-set val))
-                    [(conj left-only val) in-common (conj left-and-common val)]
-                    [left-only (conj in-common val) (conj left-and-common val)]))
-                [[] [] []]
-                left)
-
-        right-only (reduce (fn [right-only val]
-                             (if (nil? (get left-set val))
-                               (conj right-only val)
-                               right-only))
-                           []
-                           right)]
-    [left-only in-common left-and-common right-only])  )
 
 (defn cmb-cols-vt [& args]
   (util/vmap util/vflatten
@@ -70,55 +39,6 @@
    :right-not-nil (fn [_ _ left right]
                     (if right right left))})
 
-(defprotocol Tabular
-  "The Tabular protocol represents tabular data.  (Rows and columns)."
-  (colnames [this])
-  (rownames [this])
-  (ncol [this])
-  (nrow [this])
-  (not-nil [this])
-
-  (equal? [this other])
-
-  (lookup-names [this axis xs])
-
-  (col-vectors [this])
-  (row-vectors [this])
-
-  ;; select
-  (select-cols-by-index [this cols])
-  (select-rows-by-index [this rows])
-  ($ [this col-spec]
-     [this col-spec row-spec])
-
-  ;; drop
-  (drop-cols-by-index [this cols])
-  (drop-rows-by-index [this cols])
-  ($- [this col-spec]
-      [this col-spec row-spec])
-
-  (add-col [this colname column]
-           [this add-map])
-
-  (rename-col [this old-colname new-colname]
-              [this rename-map])
-
-  (replace-col [this colname column]
-               [this replace-map])
-
-  (set-col [this colname column]
-           [this set-map])
-  
-  (set-colnames [this new-colnames])
-  (set-rownames [this new-rownames])
-
-  ;; combine dataframes
-  (conj-cols [this right])
-  (conj-rows [this bottom])
-  (merge-frames [this other resolution-fn])
-  (join-frames [this right on join-type]
-               [this right left-on right-on join-type]))
-
 (deftype DataFrame
     [colnames    ; a vector of column names, giving column order
      columns     ; a vector of column vectors
@@ -129,18 +49,7 @@
      rowname-idx ; (optional) a hash-map of rowname => 0-based index
      ]
 
-  clojure.lang.IFn
-
-  ;; invoke DataFrame as function to do a ($) select operation
-  (invoke
-   [this col-spec row-spec]
-   ($ this col-spec row-spec))
-  
-  (invoke
-   [this col-spec]
-   ($ this col-spec))
-
-  Tabular
+  dfu/Tabular
 
   ;; get simple attributes
   (colnames [this] colnames)
@@ -160,9 +69,9 @@
    [this other]
    "  Uses colnames, columns, and rownames as the basis for equality
   comparison with another DataFrame."
-   (and (= colnames (explojure.dataframe.core/colnames other))
-        (= rownames (explojure.dataframe.core/rownames other))
-        (= columns (vec (col-vectors other)))))
+   (and (= colnames (colnames other))
+        (= rownames (rownames other))
+        (= columns (vec (dfu/col-vectors other)))))
 
   ;; convert names to 0-based indices
   (lookup-names
@@ -202,7 +111,7 @@
   ;; select
   (select-cols-by-index
    [this cols]
-   (if (= (ncol this) 0)
+   (if (= (dfu/ncol this) 0)
      this
      (do
        (assert (sequential? cols)
@@ -220,7 +129,7 @@
   
   (select-rows-by-index
    [this rows]
-   (if (= (nrow this) 0)
+   (if (= (dfu/nrow this) 0)
      this
      (do
        (assert (sequential? rows)
@@ -239,7 +148,7 @@
                         nil)))))
   ($
    [this col-spec]
-   ($ this col-spec nil))
+   (dfu/$ this col-spec nil))
   
   ($
    [this col-spec row-spec]
@@ -248,32 +157,32 @@
    (let [filtered this
          filtered (if (nil? col-spec)
                     filtered
-                    (let [col-indices (interpret-spec this :cols col-spec)]
-                      (select-cols-by-index filtered col-indices)))
+                    (let [col-indices (spec/interpret-spec this :cols col-spec)]
+                      (dfu/select-cols-by-index filtered col-indices)))
          filtered (if (nil? row-spec)
                     filtered
-                    (let [row-indices (interpret-spec this :rows row-spec)]
-                      (select-rows-by-index filtered row-indices)))]
+                    (let [row-indices (spec/interpret-spec this :rows row-spec)]
+                      (dfu/select-rows-by-index filtered row-indices)))]
      (cond
        ;; return resulting dataframe
-       (and (multi-selector? col-spec)
-            (multi-selector? row-spec))
+       (and (spec/multi-specifier? col-spec)
+            (spec/multi-specifier? row-spec))
        filtered
        
        ;; handle single row
-       (and (multi-selector? col-spec)
-            (not (multi-selector? row-spec)))
-       (first (row-vectors filtered))
+       (and (spec/multi-specifier? col-spec)
+            (not (spec/multi-specifier? row-spec)))
+       (first (dfu/row-vectors filtered))
 
        ;; handle single col
-       (and (not (multi-selector? col-spec))
-            (multi-selector? row-spec))
-       (first (col-vectors filtered))
+       (and (not (spec/multi-specifier? col-spec))
+            (spec/multi-specifier? row-spec))
+       (first (dfu/col-vectors filtered))
 
        ;; return single value
-       (and (not (multi-selector? col-spec))
-            (not (multi-selector? row-spec)))
-       (first (first (col-vectors filtered))))))
+       (and (not (spec/multi-specifier? col-spec))
+            (not (spec/multi-specifier? row-spec)))
+       (first (first (dfu/col-vectors filtered))))))
 
   ;; drop
   ;; TODO: The dropping mechanism in these two functions
@@ -281,7 +190,7 @@
   ;;   our (filter #(not (drop-set %)).
   (drop-cols-by-index
    [this cols]
-   (if (= (ncol this) 0)
+   (if (= (dfu/ncol this) 0)
      this
      (do
        (assert (sequential? cols)
@@ -292,12 +201,12 @@
                "drop-cols-by-index: negative column indices not allowed.")
        
        (let [drop-set (set cols)]
-         (select-cols-by-index this
+         (dfu/select-cols-by-index this
                                (util/vfilter #(not (drop-set %))
                                              (util/vrange column-ct)))))))
   (drop-rows-by-index
    [this rows]
-   (if (= (nrow this) 0)
+   (if (= (dfu/nrow this) 0)
      this
      (do
        (assert (sequential? rows)
@@ -308,13 +217,13 @@
                "drop-rows-by-index: negative row indices not allowed.")
        
        (let [drop-set (set rows)]
-         (select-rows-by-index this
+         (dfu/select-rows-by-index this
                                (util/vfilter #(not (drop-set %))
                                              (util/vrange row-ct)))))))
 
   ($-
    [this col-spec]
-   ($- this col-spec nil))
+   (dfu/$- this col-spec nil))
 
   ($-
    [this col-spec row-spec]
@@ -323,12 +232,12 @@
    (let [filtered this
          filtered (if (nil? col-spec)
                     filtered
-                    (let [col-indices (interpret-spec this :cols col-spec)]
-                      (drop-cols-by-index filtered col-indices)))
+                    (let [col-indices (spec/interpret-spec this :cols col-spec)]
+                      (dfu/drop-cols-by-index filtered col-indices)))
          filtered (if (nil? row-spec)
                     filtered
-                    (let [row-indices (interpret-spec this :rows row-spec)]
-                      (drop-rows-by-index filtered row-indices)))]
+                    (let [row-indices (spec/interpret-spec this :rows row-spec)]
+                      (dfu/drop-rows-by-index filtered row-indices)))]
      filtered))
 
   (add-col
@@ -396,15 +305,15 @@
   (set-col
    [this colname column]
    (if (contains? colname-idx colname)
-     (replace-col this colname column)
-     (add-col this colname column)))
+     (dfu/replace-col this colname column)
+     (dfu/add-col this colname column)))
 
   (set-col
    [this set-map]
    (assert (associative? set-map)
            (str "set-col: set-map must be associative. (Received " (type set-map) ".)"))
    (reduce (fn [df [colname column]]
-             (set-col df colname column))
+             (dfu/set-col df colname column))
            this
            (seq set-map)))
 
@@ -422,15 +331,15 @@
 
   (conj-cols
    [this right]
-   (let [left-colnames (explojure.dataframe.core/colnames this)
-         right-colnames (explojure.dataframe.core/colnames right)
-         left-rownames (explojure.dataframe.core/rownames this)
-         right-rownames (explojure.dataframe.core/rownames right)
+   (let [left-colnames (dfu/colnames this)
+         right-colnames (dfu/colnames right)
+         left-rownames (dfu/rownames this)
+         right-rownames (dfu/rownames right)
          
          colname-conflicts (s/intersection (set left-colnames)
                                            (set right-colnames))
-         equal-nrow (= (nrow this)
-                       (nrow right))
+         equal-nrow (= (dfu/nrow this)
+                       (dfu/nrow right))
 
          left-has-rownames (not (nil? left-rownames))
          right-has-rownames (not (nil? right-rownames))
@@ -443,24 +352,24 @@
      
      (if align-rownames
        ;; if both DFs have rownames
-       (let [[left-only in-common left-and-common right-only] (venn-components left-rownames
+       (let [[left-only in-common left-and-common right-only] (util/venn-components left-rownames
                                                                                right-rownames)
              
              combined-colnames
              (util/vconcat left-colnames right-colnames)
 
              combined-columns
-             (cmb-cols-vt (cmb-cols-hr (col-vectors ($ this nil left-only))
-                                       (nil-cols (ncol right) (count left-only)))
-                          (cmb-cols-hr (col-vectors ($ this nil in-common))
-                                       (col-vectors ($ right nil in-common)))
-                          (cmb-cols-hr (nil-cols (ncol this) (count right-only))
-                                       (col-vectors ($ right nil right-only))))
+             (cmb-cols-vt (cmb-cols-hr (dfu/col-vectors (dfu/$ this nil left-only))
+                                       (dfu/nil-cols (dfu/ncol right) (count left-only)))
+                          (cmb-cols-hr (dfu/col-vectors (dfu/$ this nil in-common))
+                                       (dfu/col-vectors (dfu/$ right nil in-common)))
+                          (cmb-cols-hr (dfu/nil-cols (dfu/ncol this) (count right-only))
+                                       (dfu/col-vectors (dfu/$ right nil right-only))))
              
              combined-rownames
              (util/vconcat left-only in-common right-only)]
          
-         ($ (new-dataframe combined-colnames
+         (dfu/$ (new-dataframe combined-colnames
                            combined-columns
                            combined-rownames)
             (concat left-and-common right-only)
@@ -470,18 +379,18 @@
        (let [combined-colnames (util/vconcat left-colnames
                                              right-colnames)
 
-             combined-columns (util/vconcat (col-vectors this)
-                                            (col-vectors right))
+             combined-columns (util/vconcat (dfu/col-vectors this)
+                                            (dfu/col-vectors right))
 
              ;; at this point we know it is not true that both DFs have rownames
              ;; so use the one that has them.  Or nil if neither has them.
-             use-rownames (if (explojure.dataframe.core/rownames this)
-                            (explojure.dataframe.core/rownames this)
-                            (explojure.dataframe.core/rownames right))
+             use-rownames (if (dfu/rownames this)
+                            (dfu/rownames this)
+                            (dfu/rownames right))
 
-             [left-only in-common left-and-common right-only] (venn-components left-colnames
+             [left-only in-common left-and-common right-only] (util/venn-components left-colnames
                                                                                right-colnames)]
-         ($ (new-dataframe combined-colnames
+         (dfu/$ (new-dataframe combined-colnames
                            combined-columns
                            use-rownames)
             (concat left-and-common right-only)
@@ -489,8 +398,8 @@
 
   (conj-rows
    [this bottom]
-   (let [top-rownames (explojure.dataframe.core/rownames this)
-         bottom-rownames (explojure.dataframe.core/rownames bottom)
+   (let [top-rownames (dfu/rownames this)
+         bottom-rownames (dfu/rownames bottom)
 
          top-has-rownames (not (nil? top-rownames))
          bottom-has-rownames (not (nil? bottom-rownames))
@@ -508,29 +417,29 @@
      (assert (= (count rowname-conflicts) 0)
              (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge-frames) if appropriate."))
 
-       (let [top-colnames (explojure.dataframe.core/colnames this)
-             bottom-colnames (explojure.dataframe.core/colnames bottom)
+       (let [top-colnames (dfu/colnames this)
+             bottom-colnames (dfu/colnames bottom)
 
-             [top-only in-common top-and-common bottom-only] (venn-components top-colnames
+             [top-only in-common top-and-common bottom-only] (util/venn-components top-colnames
                                                                               bottom-colnames)
              cmb-colnames (util/vconcat top-only in-common bottom-only)
              
              cmb-columns (cmb-cols-vt
-                          (cmb-cols-hr (col-vectors ($ this top-only nil))
-                                           (col-vectors ($ this in-common nil))
-                                           (nil-cols (count bottom-only)
-                                                     (nrow this)))
-                          (cmb-cols-hr (nil-cols (count top-only)
-                                                     (nrow bottom))
-                                           (col-vectors ($ bottom in-common nil))
-                                           (col-vectors ($ bottom bottom-only nil))))
+                          (cmb-cols-hr (dfu/col-vectors (dfu/$ this top-only nil))
+                                           (dfu/col-vectors (dfu/$ this in-common nil))
+                                           (dfu/nil-cols (count bottom-only)
+                                                     (dfu/nrow this)))
+                          (cmb-cols-hr (dfu/nil-cols (count top-only)
+                                                     (dfu/nrow bottom))
+                                           (dfu/col-vectors (dfu/$ bottom in-common nil))
+                                           (dfu/col-vectors (dfu/$ bottom bottom-only nil))))
              
              cmb-rownames (if both-have-rownames
                             (util/vconcat top-rownames
                                           bottom-rownames)
                             nil)]
          
-         ($ (new-dataframe cmb-colnames
+         (dfu/$ (new-dataframe cmb-colnames
                            cmb-columns
                            cmb-rownames)
             (concat top-and-common bottom-only)
@@ -538,10 +447,10 @@
 
   (merge-frames
    [this right resolution-fn]
-   (let [left-colnames (explojure.dataframe.core/colnames this)
-         right-colnames (explojure.dataframe.core/colnames right)
-         left-rownames (explojure.dataframe.core/rownames this)
-         right-rownames (explojure.dataframe.core/rownames right)]
+   (let [left-colnames (dfu/colnames this)
+         right-colnames (dfu/colnames right)
+         left-rownames (dfu/rownames this)
+         right-rownames (dfu/rownames right)]
 
      ;; some input validation
      (assert (and left-colnames right-colnames
@@ -554,9 +463,9 @@
 
      (let [;; set components
            [rn-left-only rn-in-common rn-left-and-common rn-right-only]
-           (venn-components left-rownames right-rownames)
+           (util/venn-components left-rownames right-rownames)
            [cn-left-only cn-in-common cn-left-and-common cn-right-only]
-           (venn-components left-colnames right-colnames)
+           (util/venn-components left-colnames right-colnames)
 
            ;; overlap / conflict
            conflict-columns (for [c cn-in-common]
@@ -568,28 +477,28 @@
                                       (map vector
                                            (repeat col)
                                            rownames
-                                           ($ this col rownames)
-                                           ($ right col rownames)))))
+                                           (dfu/$ this col rownames)
+                                           (dfu/$ right col rownames)))))
 
            combined-columns
            (cmb-cols-vt
-            (cmb-cols-hr (col-vectors ($ this cn-left-only rn-left-only))
-                         (col-vectors ($ this cn-in-common rn-left-only))
-                         (nil-cols (count cn-right-only) (count rn-left-only)))
+            (cmb-cols-hr (dfu/col-vectors (dfu/$ this cn-left-only rn-left-only))
+                         (dfu/col-vectors (dfu/$ this cn-in-common rn-left-only))
+                         (dfu/nil-cols (count cn-right-only) (count rn-left-only)))
             
-            (cmb-cols-hr (col-vectors ($ this cn-left-only rn-in-common))
+            (cmb-cols-hr (dfu/col-vectors (dfu/$ this cn-left-only rn-in-common))
                          resolved
-                         (col-vectors ($ right cn-right-only rn-in-common)))
+                         (dfu/col-vectors (dfu/$ right cn-right-only rn-in-common)))
             
-            (cmb-cols-hr (nil-cols (count cn-left-only) (count rn-right-only))
-                         (col-vectors ($ right cn-in-common rn-right-only))
-                         (col-vectors ($ right cn-right-only rn-right-only))))
+            (cmb-cols-hr (dfu/nil-cols (count cn-left-only) (count rn-right-only))
+                         (dfu/col-vectors (dfu/$ right cn-in-common rn-right-only))
+                         (dfu/col-vectors (dfu/$ right cn-right-only rn-right-only))))
            
            combined-colnames (util/vconcat cn-left-only cn-in-common cn-right-only)
            
            combined-rownames (util/vconcat rn-left-only rn-in-common rn-right-only)]
        
-       ($ (new-dataframe combined-colnames
+       (dfu/$ (new-dataframe combined-colnames
                          combined-columns
                          combined-rownames)
           (concat cn-left-and-common cn-right-only)
@@ -597,11 +506,35 @@
 
   (join-frames
    [this right on join-type]
-   (join-frames this right on on join-type))
+   (dfu/join-frames this right on on join-type))
 
   (join-frames
    [this right left-on right-on join-type]
-   (join/join this right left-on right-on join-type)))
+   (let [[lo-sel lc-sel rc-sel ro-sel]
+         (join/join-selections (apply (partial map vector) (dfu/col-vectors
+                                                            (dfu/$ this left-on nil)))
+                               (apply (partial map vector) (dfu/col-vectors
+                                                            (dfu/$ right right-on nil))))
+
+         lo (dfu/$ this nil lo-sel)
+         ro (dfu/$ this nil lc-sel)]))
+
+  clojure.lang.IFn
+
+  ;; invoke DataFrame as function to do a ($) select operation
+  (invoke
+   [this col-spec row-spec]
+   (dfu/$ this col-spec row-spec))
+  
+  (invoke
+   [this col-spec]
+   (dfu/$ this col-spec)))
+
+(defn empty-df
+  "Create a dataframe with the specified column names and nrow nils per column."
+  [colnames nrow]
+  (new-dataframe colnames
+                 (dfu/nil-cols (count colnames) nrow)))
 
 (defn new-dataframe
   ([cols vecs]
@@ -631,7 +564,7 @@
                              rowname-idx))
                          nil)]
        ;; create a new DataFrame
-       (->DataFrame cols
+       (new explojure.dataframe.core.DataFrame cols
                     vecs
                     column-ct
                     colname-idx
@@ -659,75 +592,3 @@
                       (util/vfilter odd? idx))]
     (new-dataframe cols
                    vecs)))
-
-(defn interpret-nil-spec [df axis nl] nil)
-
-(defn interpret-empty-spec [df axis mpt] [])
-
-(defn interpret-fn-spec [df axis f]
-  (when (not= (count f) 1)
-    (throw (new Exception "Only one function can be passed per specifier.")))
-  (let [f (first f)]
-    (interpret-spec df
-                    axis
-                    (map boolean
-                         (map f (case axis
-                                  :cols (col-vectors df)
-                                  :rows (row-vectors df)))))))
-
-(defn interpret-int-spec [df axis ints]
-  (let [n (lookup-names df axis ints)]
-    (if (util/no-nil? n)
-      n
-      ints)))
-
-(defn interpret-bool-spec [df axis bools]
-  (when (not= (count bools) (case axis
-                              :cols (ncol df)
-                              :rows (nrow df)))
-    (throw (new Exception "Boolean specifiers must have length equal to ncol or nrow.")))
-  (util/where bools))
-
-(defn interpret-name-spec [df axis names]
-  (let [n (lookup-names df axis names)]
-    (if (util/no-nil? n)
-      n
-      (throw
-       (new Exception
-            (str "The given DataFrame does not have the following "
-                 (case axis
-                   :cols "column"
-                   :rows "row")
-                 " names: "
-                 (vec (util/filter-ab (map not (map boolean n))
-                                      names))))))))
-
-;; TODO: This conditional code looks brittle to me.
-;;   Think about if there is a better way to do this.
-(defn interpret-spec [df axis spec]
-  (cond
-    ;; handle nils
-    (nil? spec)
-    (interpret-nil-spec df axis spec)
-    
-    ;; handle empty sequentials
-    (and (sequential? spec)
-         (= (count spec) 0))
-    (interpret-empty-spec df axis spec)
-    
-    ;; handle everything else
-    :else
-    (let [spec (util/make-vector spec)
-          f (first spec)]
-      (when (not (util/same-type spec))
-        (throw
-         (new Exception "All elements of spec must be of the same type.")))
-      (cond
-        (fn? f)                       (interpret-fn-spec df axis spec)
-        (integer? f)                  (interpret-int-spec df axis spec)
-        (util/boolean? f)             (interpret-bool-spec df axis spec)
-        (or (string? f) (keyword? f)) (interpret-name-spec df axis spec)
-        :else (throw (new Exception (str "Specifiers must be nil, [], fn, integer, boolean, string, or keyword. Received " (type f))))))))
-
-
-

@@ -1,71 +1,63 @@
 (ns explojure.dataframe.join
-  (:require [explojure.dataframe.core :as df]
+  (:require [explojure.dataframe.util :as dfu]
+            [explojure.util :as util]
+            
             [clojure.set :as set]))
 
-(defn gen-index [& cols]
-  (reduce (fn [index entry]
-            (let [[key val] entry]
-              (assoc index
-                     key
-                     (conj (get index key [])
-                           val))))
-          (hash-map)
-          (map vector
-               (apply (partial map vector) cols)
-               (range (count (first cols))))))
+(defn row-indices
+  "For each x in xs, return [x i], where i is the 0-based index."
+  [xs]
+  (map vector
+       xs
+       (range (count xs))))
 
+(defn gen-key-row-lookup
+  "Create a hash-map for keys => [indices]."
+  [ri]
+  (reduce (fn [m [k i]]
+            (assoc m k (conj (get m k [])
+                             i)))
+          {}
+          ri))
 
-(defn- filter-keys [l-idx r-idx join-type]
-  (let [l-keys (apply hash-set (keys l-idx))
-        r-keys (apply hash-set (keys r-idx))
-        ;; all join types will have the inner keys
-        filtered-keys (set/intersection l-keys r-keys)
+(defn join-selections
+  "Return the row selection indices for a full outer join."
+  [left-keys right-keys]
+  (let [components (util/venn-components left-keys right-keys)
+        [left-only in-common left-and-common right-only] components
+      
+        left-lkp (gen-key-row-lookup (row-indices left-keys))
+        right-lkp (gen-key-row-lookup (row-indices right-keys))
         
-        ;; if :left or :outer, add the left-only keys
-        filtered-keys (if (or (= join-type :left)
-                              (= join-type :outer))
-                        (set/union filtered-keys
-                                   (set/difference l-keys r-keys))
-                        filtered-keys)
+        ;; get left- and right-only rows
+        left-only-sel (flatten
+                             (map #(get left-lkp %)
+                                  (util/unique left-only)))
+        right-only-sel (flatten
+                              (map #(get right-lkp %)
+                                   (util/unique right-only)))
 
-        ;; if :right or :outer, add the right-only keys
-        filtered-keys (if (or (= join-type :right)
-                              (= join-type :outer))
-                        (set/union filtered-keys
-                                   (set/difference r-keys l-keys))
-                        filtered-keys)]
-    filtered-keys))
-
-(defn- choose-rows [l-idx r-idx filtered-keys]
-  (reduce  (fn [[left-only [left-inner right-inner] right-only] key]
-             (let [l-rows (l-idx key)
-                   r-rows (r-idx key)]
-               [;; handle left-only
-                (if (nil? r-rows)
-                  (concat left-only l-rows)
-                  left-only)
-
-                ;; handle inner
-                (if (and l-rows r-rows)
-                  [(concat left-inner
-                           (sort (apply concat (repeat (count r-rows) l-rows))))
-                   (concat right-inner
-                           (apply concat (repeat (count l-rows) (sort r-rows))))]
-                  [left-inner right-inner])
-
-                ;; handle right-only
-                (if (nil? l-rows)
-                  (concat right-only r-rows)
-                  right-only)]))
-
-           ;; [left-only [left-inner right-inner] right-only]
-           [[] [[] []] []]
-           
-           filtered-keys))
-
-(defn empty-df [colnames nrows]
-  (df/new-dataframe colnames
-                    (df/nil-cols (count colnames) nrows)))
+        ;; get in-common rows
+        [left-common-sel right-common-sel]
+        (reduce (fn [[lefts rights] k]
+                  (let [lt (get left-lkp k)
+                        lt-ct (count lt)
+                        rt (get right-lkp k)
+                        rt-ct (count rt)]
+                    [(concat lefts
+                             (flatten
+                              (map #(repeat rt-ct %)
+                             lt)))
+                     (concat rights
+                             (flatten
+                              (repeat lt-ct rt)))]))
+                [[] []]
+                (util/unique in-common))]
+    
+    [left-only-sel
+     left-common-sel
+     right-common-sel
+     right-only-sel]))
 
 (defn avoid-collisions [l-join r-join l r]
   (let [l-non-join (set/difference (set l) (set l-join))
@@ -82,66 +74,3 @@
                           collisions))]
     [(repl-fn "_x")
      (repl-fn "_y")]))
-
-(defn join
-  ([left right on join-type] (join left right on on join-type))
-  ([left right left-on right-on join-type]
-
-   ;; Right now we don't have a good way of dealing with dataframes that
-   ;; have rownames.  So don't allow it.
-   (assert (and (nil? (df/rownames left))
-                (nil? (df/rownames right)))
-           (str "join: Joining on dataframes that have rownames is currently unimplemented."))
-
-   ;; proceed
-   (let [;; create index for key columns on left and right DFs
-         l-idx (apply gen-index (df/col-vectors (df/$ left left-on nil)))
-         r-idx (apply gen-index (df/col-vectors (df/$ right right-on nil)))
-
-         ;; choose the row indices to draw from each DF
-         [left-only
-          [left-inner right-inner]
-          right-only] (choose-rows l-idx
-                                   r-idx
-                                   (filter-keys l-idx r-idx join-type))
-
-         ;; column names in the DFs
-         left-cols (df/colnames left)
-         right-cols (df/colnames right)
-
-         ;; intersect join columns
-         common-join-cols (set/intersection (set left-on) (set right-on))
-
-         ;; get the appropriate rows from each DF
-         ri-rows (df/$ right right-cols right-inner)
-         re-rows (empty-df right-cols (count left-only))
-         ro-rows (df/$ right right-cols right-only)
-
-         li-rows (df/$ left left-cols left-inner)
-         lo-rows (df/$ left left-cols left-only)
-
-         ;; left-empty frame is special because we need to
-         ;; grab the keys from the corresponding right-only
-         ;; data frame
-         le-rows (df/conj-cols (as-> ro-rows x
-                                 (df/col-vectors (df/$ x right-on nil))
-                                 (df/rename-col x (zipmap right-on left-on)))
-                               (empty-df (remove #(contains? (set left-on) %)
-                                                 left-cols)
-                                         (count right-only)))
-
-         
-         ;; combine the rows for each side
-         left-side (reduce df/conj-rows [li-rows lo-rows le-rows])
-         right-side (reduce df/conj-rows [ri-rows re-rows ro-rows])
-
-         ;; avoid column name collisions with _x and _y
-         [left-repl right-repl] (avoid-collisions left-on
-                                                  right-on
-                                                  left-cols
-                                                  right-cols)]
-     
-     (df/conj-cols (df/rename-col left-side left-repl)
-                   (df/$- (df/rename-col right-side right-repl)
-                          common-join-cols
-                          nil)))))
