@@ -47,7 +47,7 @@
 (defn df->str [df]
   (let [colnames (dfu/colnames df)
         columns (dfu/col-vectors df)
-        new-df (dfu/new-dataframe colnames
+        new-df (df-core/new-dataframe colnames
                                       (util/vmap (fn [col]
                                                    (let [mx-wd (max-width col)
                                                          wd (min mx-wd 30)]
