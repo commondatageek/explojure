@@ -204,36 +204,34 @@
   ;;   our (filter #(not (drop-set %)).
   (drop-cols-by-index
    [this cols]
-   (if (= (dfu/ncol this) 0)
-     this
-     (do
-       (assert (sequential? cols)
-               "drop-cols-by-index: column indices must be supplied in a sequential collection.")
-       (assert (every? integer? cols)
-               "drop-cols-by-index: supplied column indices must be integers.")
-       (assert (every? #(not (neg? %)) cols)
-               "drop-cols-by-index: negative column indices not allowed.")
-       
-       (let [drop-set (set cols)]
-         (dfu/select-cols-by-index this
+   (assert (sequential? cols)
+           "drop-cols-by-index: column indices must be supplied in a sequential collection.")
+   (assert (every? integer? cols)
+           "drop-cols-by-index: supplied column indices must be integers.")
+   (assert (every? #(not (neg? %)) cols)
+           "drop-cols-by-index: negative column indices not allowed.")
+   (assert (every? #(< % column-ct) cols)
+           "select-cols-by-index: col indices must be within range [0, ncol-1]")
+   (let [drop-set (set cols)]
+     (dfu/select-cols-by-index this
                                (util/vfilter #(not (drop-set %))
-                                             (util/vrange column-ct)))))))
+                                             (util/vrange column-ct)))))
+  
   (drop-rows-by-index
    [this rows]
-   (if (= (dfu/nrow this) 0)
-     this
-     (do
-       (assert (sequential? rows)
-               "drop-rows-by-index: row indices must be supplied in a sequential collection.")
-       (assert (every? integer? rows)
-               "drop-rows-by-index: supplied row indices must be integers.")
-       (assert (every? #(not (neg? %)) rows)
-               "drop-rows-by-index: negative row indices not allowed.")
-       
-       (let [drop-set (set rows)]
-         (dfu/select-rows-by-index this
+   (assert (sequential? rows)
+           "drop-rows-by-index: row indices must be supplied in a sequential collection.")
+   (assert (every? integer? rows)
+           "drop-rows-by-index: supplied row indices must be integers.")
+   (assert (every? #(not (neg? %)) rows)
+           "drop-rows-by-index: negative row indices not allowed.")
+   (assert (every? #(< % row-ct) rows)
+           "select-rows-by-index: row indices must be within range [0, nrow-1]")
+   
+   (let [drop-set (set rows)]
+     (dfu/select-rows-by-index this
                                (util/vfilter #(not (drop-set %))
-                                             (util/vrange row-ct)))))))
+                                             (util/vrange row-ct)))))
 
   ($-
    [this col-spec]
@@ -248,7 +246,11 @@
                     filtered
                     (let [col-indices (spec/interpret-spec this :cols col-spec)]
                       (dfu/drop-cols-by-index filtered col-indices)))
-         filtered (if (nil? row-spec)
+         ;; if it's empty after filtering on columns, then we
+         ;; have an empty dataframe without a rownames field, etc.
+         ;; it doesn't make sense to try to filter on the rows.
+         filtered (if (or (nil? row-spec)
+                          (= (dfu/ncol filtered) 0))
                     filtered
                     (let [row-indices (spec/interpret-spec this :rows row-spec)]
                       (dfu/drop-rows-by-index filtered row-indices)))]
