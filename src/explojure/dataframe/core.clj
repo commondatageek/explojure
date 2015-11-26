@@ -299,23 +299,17 @@
            (str "replace-col: Cannot replace a column that doesn't exist (" colname ")."))
    (let [cn-idx (get colname-idx colname)]
      (new-dataframe colnames
-                    (assoc columns cn-idx column))))
+                    (assoc columns cn-idx column)
+                    rownames)))
 
   (replace-col
    [this replace-map]
    (assert (associative? replace-map)
            (str "replace-col: replace-map must be associative. (Received " (type replace-map) ".)"))
-   (let [non-cols (util/vfilter #(not (contains? colname-idx %))
-                                (keys replace-map))]
-     (assert (= (count non-cols) 0)
-             (str "replace-col: Cannot replace columns that don't exist: " non-cols)))
-   (new-dataframe colnames
-                  (reduce (fn [v [colname new-column]]
-                            (let [cn-idx (get colname-idx colname)]
-                              (assoc v cn-idx new-column)))
-                          columns
-                          (seq replace-map))
-                  rownames))
+   (reduce (fn [d [oc nd]]
+             (dfu/replace-col d oc nd))
+           this
+           (seq replace-map)))
 
   (set-col
    [this colname column]
