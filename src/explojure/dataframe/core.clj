@@ -24,6 +24,12 @@
           {}
           keyvals))
 
+(defn empty-sequential? [x]
+  (if (and (sequential? x)
+           (= (count x) 0))
+    true
+    false))
+
 (def conflict-resolution-strategies
   {;; always return left value
    :left (fn [_ _ left _] left)
@@ -123,7 +129,7 @@
    (if (= (count cols) 0)
      (do
        (binding [*out* *err*]
-         (println "WARNING: selecting 0 columns")
+         (println "WARNING: selecting 0 columns and, consequently, 0 rows")
          (when rownames
            (println "WARNING: dropping rownames")))
        (new-dataframe [] []))
@@ -149,6 +155,7 @@
                     (vec (for [c columns]
                            (util/vmap c rows)))
                     (util/vmap rownames rows))))
+
   ($
    [this col-spec]
    (dfu/$ this col-spec nil))
@@ -162,7 +169,11 @@
                     filtered
                     (let [col-indices (spec/interpret-spec this :cols col-spec)]
                       (dfu/select-cols-by-index filtered col-indices)))
-         filtered (if (nil? row-spec)
+         ;; if empty sequential was passed as col-spec, then we've
+         ;; got an empty dataframe without a rownames field, etc.
+         ;; it doesn't make sense to try to filter on the rows.
+         filtered (if (or (nil? row-spec)
+                          (empty-sequential? col-spec))
                     filtered
                     (let [row-indices (spec/interpret-spec this :rows row-spec)]
                       (dfu/select-rows-by-index filtered row-indices)))]
