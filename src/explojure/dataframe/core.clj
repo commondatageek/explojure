@@ -340,65 +340,6 @@
 
 
   
-  (merge-frames
-   [this right resolution-fn]
-   (let [left-colnames (dfu/colnames this)
-         right-colnames (dfu/colnames right)
-         left-rownames (dfu/rownames this)
-         right-rownames (dfu/rownames right)]
-
-     ;; some input validation
-     (assert (and left-colnames right-colnames
-                  left-rownames right-rownames)
-             (str "merge: both DataFrames must have both rownames and colnames:\n"
-                  "left colnames: " (if left-colnames "supplied" "missing") "\n"
-                  "left rownames: " (if left-rownames "supplied" "missing") "\n"
-                  "right colnames: " (if right-colnames "supplied" "missing") "\n"
-                  "right rownames: " (if right-rownames "supplied" "missing")))
-
-     (let [;; set components
-           [rn-left-only rn-in-common rn-left-and-common rn-right-only]
-           (util/venn-components left-rownames right-rownames)
-           [cn-left-only cn-in-common cn-left-and-common cn-right-only]
-           (util/venn-components left-colnames right-colnames)
-
-           ;; overlap / conflict
-           conflict-columns (for [c cn-in-common]
-                              [c rn-in-common])
-
-           ;; resolve conflicts
-           resolved (vec (for [[col rownames] conflict-columns]
-                           (util/vmap #(apply resolution-fn %)
-                                      (map vector
-                                           (repeat col)
-                                           rownames
-                                           (dfu/$ this col rownames)
-                                           (dfu/$ right col rownames)))))
-
-           combined-columns
-           (cmb-cols-vt
-            (cmb-cols-hr (dfu/col-vectors (dfu/$ this cn-left-only rn-left-only))
-                         (dfu/col-vectors (dfu/$ this cn-in-common rn-left-only))
-                         (dfu/nil-cols (count cn-right-only) (count rn-left-only)))
-            
-            (cmb-cols-hr (dfu/col-vectors (dfu/$ this cn-left-only rn-in-common))
-                         resolved
-                         (dfu/col-vectors (dfu/$ right cn-right-only rn-in-common)))
-            
-            (cmb-cols-hr (dfu/nil-cols (count cn-left-only) (count rn-right-only))
-                         (dfu/col-vectors (dfu/$ right cn-in-common rn-right-only))
-                         (dfu/col-vectors (dfu/$ right cn-right-only rn-right-only))))
-           
-           combined-colnames (util/vconcat cn-left-only cn-in-common cn-right-only)
-           
-           combined-rownames (util/vconcat rn-left-only rn-in-common rn-right-only)]
-       
-       (dfu/$ (new-dataframe combined-colnames
-                         combined-columns
-                         combined-rownames)
-          (concat cn-left-and-common cn-right-only)
-          (concat rn-left-and-common rn-right-only)))))
-
   (join-frames
    [this right on join-type]
    (dfu/join-frames this right on on join-type))
@@ -630,4 +571,71 @@
                    (concat top-and-common bottom-only)
                    nil))))
   )
+
+(defn merge-frames [df1 df2 resolution-fn]
+  (cond (or (nil? df2)
+            (= (dfu/ncol df2) 0))
+        df1
+
+        (or (nil? df1)
+            (= (dfu/ncol df1) 0))
+        df2
+
+        :default
+        (let [df1-colnames (dfu/colnames df1)
+              df2-colnames (dfu/colnames df2)
+              df1-rownames (dfu/rownames df1)
+              df2-rownames (dfu/rownames df2)]
+
+          ;; some input validation
+          (assert (and df1-colnames df2-colnames
+                       df1-rownames df2-rownames)
+                  (str "merge: both DataFrames must have both rownames and colnames:\n"
+                       "df1 colnames: " (if df1-colnames "supplied" "missing") "\n"
+                       "df1 rownames: " (if df1-rownames "supplied" "missing") "\n"
+                       "df2 colnames: " (if df2-colnames "supplied" "missing") "\n"
+                       "df2 rownames: " (if df2-rownames "supplied" "missing")))
+
+          (let [;; set components
+                [rn-df1-only rn-in-common rn-df1-and-common rn-df2-only]
+                (util/venn-components df1-rownames df2-rownames)
+                [cn-df1-only cn-in-common cn-df1-and-common cn-df2-only]
+                (util/venn-components df1-colnames df2-colnames)
+
+                ;; overlap / conflict
+                conflict-columns (for [c cn-in-common]
+                                   [c rn-in-common])
+
+                ;; resolve conflicts
+                resolved (vec (for [[col rownames] conflict-columns]
+                                (util/vmap #(apply resolution-fn %)
+                                           (map vector
+                                                (repeat col)
+                                                rownames
+                                                (dfu/$ df1 col rownames)
+                                                (dfu/$ df2 col rownames)))))
+
+                combined-columns
+                (cmb-cols-vt
+                 (cmb-cols-hr (dfu/col-vectors (dfu/$ df1 cn-df1-only rn-df1-only))
+                              (dfu/col-vectors (dfu/$ df1 cn-in-common rn-df1-only))
+                              (dfu/nil-cols (count cn-df2-only) (count rn-df1-only)))
+
+                 (cmb-cols-hr (dfu/col-vectors (dfu/$ df1 cn-df1-only rn-in-common))
+                              resolved
+                              (dfu/col-vectors (dfu/$ df2 cn-df2-only rn-in-common)))
+                 
+                 (cmb-cols-hr (dfu/nil-cols (count cn-df1-only) (count rn-df2-only))
+                              (dfu/col-vectors (dfu/$ df2 cn-in-common rn-df2-only))
+                              (dfu/col-vectors (dfu/$ df2 cn-df2-only rn-df2-only))))
+                
+                combined-colnames (util/vconcat cn-df1-only cn-in-common cn-df2-only)
+                
+                combined-rownames (util/vconcat rn-df1-only rn-in-common rn-df2-only)]
+            
+            (dfu/$ (new-dataframe combined-colnames
+                                  combined-columns
+                                  combined-rownames)
+                   (concat cn-df1-and-common cn-df2-only)
+                   (concat rn-df1-and-common rn-df2-only))))))
 
