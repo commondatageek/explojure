@@ -258,16 +258,22 @@
 
   (add-col
    [this colname column]
-   (new-dataframe (conj colnames colname)
-                  (conj columns column)
-                  rownames))
+   (let [existing (set colnames)]
+     (assert (not (existing colname))
+             (str "add-col: column \"" colname "\" already exists"))
+     (new-dataframe (conj colnames colname)
+                    (conj columns column)
+                    rownames)))
   (add-col
    [this add-map]
    (assert (associative? add-map)
            (str "add-col: add-map must be associative. (Received " (type add-map) ".)"))
-   (new-dataframe (util/vconcat colnames (keys add-map))
-                  (util/vconcat columns (vals add-map))
-                  rownames))
+   (reduce (fn [d [c v]]
+             (dfu/add-col d c v))
+           this
+           (map vector
+                (keys add-map)
+                (vals add-map))))
 
   (rename-col
    [this old-colname new-colname]
