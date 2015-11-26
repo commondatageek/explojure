@@ -111,41 +111,44 @@
   ;; select
   (select-cols-by-index
    [this cols]
-   (if (= (dfu/ncol this) 0)
-     this
+   (assert (sequential? cols)
+           "select-cols-by-index: column indices must be supplied in a sequential collection.")
+   (assert (every? integer? cols)
+           "select-cols-by-index: supplied column indices must be integers.")
+   (assert (every? #(not (neg? %)) cols)
+           "select-cols-by-index: negative column indices not allowed.")
+   (assert (every? #(< % column-ct) cols)
+           "select-cols-by-index: column indices must be within range [0, ncol-1]")
+
+   (if (= (count cols) 0)
      (do
-       (assert (sequential? cols)
-               "select-cols-by-index: column indices must be supplied in a sequential collection.")
-       (assert (every? integer? cols)
-               "select-cols-by-index: supplied column indices must be integers.")
-       (assert (every? #(not (neg? %)) cols)
-               "select-cols-by-index: negative column indices not allowed.")
-       
-       (new-dataframe (util/vmap colnames cols)
-                      (util/vmap columns cols)
-                      (if (> (count cols) 0)
-                        rownames
-                        nil)))))
+       (binding [*out* *err*]
+         (println "WARNING: selecting 0 columns")
+         (when rownames
+           (println "WARNING: dropping rownames")))
+       (new-dataframe [] []))
+     (new-dataframe (util/vmap colnames cols)
+                    (util/vmap columns cols)
+                    rownames)))
   
   (select-rows-by-index
    [this rows]
-   (if (= (dfu/nrow this) 0)
-     this
-     (do
-       (assert (sequential? rows)
-               "select-rows-by-index: row indices must be supplied in a sequential collection.")
-       (assert (every? integer? rows)
-               "select-rows-by-index: supplied row indices must be integers.")
-       (assert (every? #(not (neg? %)) rows)
-               "select-rows-by-index: negative row indices not allowed.")
-       
-       (new-dataframe colnames
-                      (apply vector
-                             (for [c columns]
-                               (util/vmap c rows)))
-                      (if (> (count rows) 0)
-                        (util/vmap rownames rows)
-                        nil)))))
+   (assert (sequential? rows)
+           "select-rows-by-index: row indices must be supplied in a sequential collection.")
+   (assert (every? integer? rows)
+           "select-rows-by-index: supplied row indices must be integers.")
+   (assert (every? #(not (neg? %)) rows)
+           "select-rows-by-index: negative row indices not allowed.")
+   (assert (every? #(< % row-ct) rows)
+           "select-rows-by-index: row indices must be within range [0, nrow-1]")
+   (if (= (count rows) 0)
+     (new-dataframe colnames
+                    (util/vrepeat (count colnames) [])
+                    (if rownames [] nil))
+     (new-dataframe colnames
+                    (vec (for [c columns]
+                           (util/vmap c rows)))
+                    (util/vmap rownames rows))))
   ($
    [this col-spec]
    (dfu/$ this col-spec nil))
@@ -564,13 +567,15 @@
                              rowname-idx))
                          nil)]
        ;; create a new DataFrame
-       (new explojure.dataframe.core.DataFrame cols
-                    vecs
-                    column-ct
-                    colname-idx
-                    rownames
-                    row-ct
-                    rowname-idx)))))
+       (new explojure.dataframe.core.DataFrame
+            cols
+            vecs
+            column-ct
+            colname-idx
+            rownames
+            row-ct
+            rowname-idx)))))
+
 
 (defn df
   "
