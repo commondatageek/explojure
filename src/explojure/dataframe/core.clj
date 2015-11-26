@@ -271,14 +271,14 @@
    (reduce (fn [d [c v]]
              (dfu/add-col d c v))
            this
-           (map vector
-                (keys add-map)
-                (vals add-map))))
+           (seq add-map)))
 
   (rename-col
    [this old-colname new-colname]
    (assert (contains? colname-idx old-colname)
-           (str "rename-col: Cannot replace a column that doesn't exist (" old-colname ")."))
+           (str "rename-col: cannot rename a column that doesn't exist (" old-colname ")."))
+   (assert (not (contains? colname-idx new-colname))
+           (str "rename-col: cannot rename column to something that already exists (" new-colname ")."))
    (let [old-cn-idx (get colname-idx old-colname)]
      (new-dataframe (assoc colnames old-cn-idx new-colname)
                     columns
@@ -288,17 +288,10 @@
    [this rename-map]
    (assert (associative? rename-map)
            (str "rename-col: rename-map must be associative. (Received " (type rename-map) ".)"))
-   (let [non-cols (util/vfilter #(not (contains? colname-idx %))
-                                (keys rename-map))]
-     (assert (= (count non-cols) 0)
-             (str "rename-col: Cannot rename columns that don't exist: " non-cols)))
-   (new-dataframe (reduce (fn [v [old-colname new-colname]]
-                            (let [old-cn-idx (get colname-idx old-colname)]
-                              (assoc v old-cn-idx new-colname)))
-                          colnames
-                          (seq rename-map))
-                  columns
-                  rownames))
+   (reduce (fn [d [o n]]
+             (dfu/rename-col d o n))
+           this
+           (seq rename-map)))
 
   (replace-col
    [this colname column]
