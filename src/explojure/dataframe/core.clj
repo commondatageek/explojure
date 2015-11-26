@@ -338,73 +338,8 @@
                   columns
                   new-rownames))
 
-  (conj-cols
-   [this right]
-   (let [left-colnames (dfu/colnames this)
-         right-colnames (dfu/colnames right)
-         left-rownames (dfu/rownames this)
-         right-rownames (dfu/rownames right)
-         
-         colname-conflicts (s/intersection (set left-colnames)
-                                           (set right-colnames))
-         equal-nrow (= (dfu/nrow this)
-                       (dfu/nrow right))
 
-         left-has-rownames (not (nil? left-rownames))
-         right-has-rownames (not (nil? right-rownames))
-         
-         align-rownames (and left-has-rownames
-                             right-has-rownames)]
-     
-     (assert (= (count colname-conflicts) 0)
-             (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge-frames) if appropriate."))
-     
-     (if align-rownames
-       ;; if both DFs have rownames
-       (let [[left-only in-common left-and-common right-only] (util/venn-components left-rownames
-                                                                               right-rownames)
-             
-             combined-colnames
-             (util/vconcat left-colnames right-colnames)
-
-             combined-columns
-             (cmb-cols-vt (cmb-cols-hr (dfu/col-vectors (dfu/$ this nil left-only))
-                                       (dfu/nil-cols (dfu/ncol right) (count left-only)))
-                          (cmb-cols-hr (dfu/col-vectors (dfu/$ this nil in-common))
-                                       (dfu/col-vectors (dfu/$ right nil in-common)))
-                          (cmb-cols-hr (dfu/nil-cols (dfu/ncol this) (count right-only))
-                                       (dfu/col-vectors (dfu/$ right nil right-only))))
-             
-             combined-rownames
-             (util/vconcat left-only in-common right-only)]
-         
-         (dfu/$ (new-dataframe combined-colnames
-                           combined-columns
-                           combined-rownames)
-            (concat left-and-common right-only)
-            nil))
-
-       ;; if one or none of the DFs have rownames
-       (let [combined-colnames (util/vconcat left-colnames
-                                             right-colnames)
-
-             combined-columns (util/vconcat (dfu/col-vectors this)
-                                            (dfu/col-vectors right))
-
-             ;; at this point we know it is not true that both DFs have rownames
-             ;; so use the one that has them.  Or nil if neither has them.
-             use-rownames (if (dfu/rownames this)
-                            (dfu/rownames this)
-                            (dfu/rownames right))
-
-             [left-only in-common left-and-common right-only] (util/venn-components left-colnames
-                                                                               right-colnames)]
-         (dfu/$ (new-dataframe combined-colnames
-                           combined-columns
-                           use-rownames)
-            (concat left-and-common right-only)
-            nil)))))
-
+  
   (conj-rows
    [this bottom]
    (let [top-rownames (dfu/rownames this)
@@ -603,3 +538,82 @@
                       (util/vfilter odd? idx))]
     (new-dataframe cols
                    vecs)))
+
+(defn conj-cols [left right]
+  (cond (or (nil? left)
+            (= (dfu/ncol left) 0))
+        right
+        
+        (or (nil? right)
+            (= (dfu/ncol right) 0))
+        left
+
+        :default
+        (let [left-colnames (dfu/colnames left)
+              right-colnames (dfu/colnames right)
+              left-rownames (dfu/rownames left)
+              right-rownames (dfu/rownames right)
+              
+              colname-conflicts (s/intersection (set left-colnames)
+                                                (set right-colnames))
+              equal-nrow (= (dfu/nrow left)
+                            (dfu/nrow right))
+
+              left-has-rownames (not (nil? left-rownames))
+              right-has-rownames (not (nil? right-rownames))
+              
+              align-rownames (and left-has-rownames
+                                  right-has-rownames)]
+          
+          (assert (= (count colname-conflicts) 0)
+                  (str "conj-cols: colnames must be free of conflicts (" colname-conflicts "). Consider using (merge-frames) if appropriate."))
+          
+          (if align-rownames
+            ;; if both DFs have rownames
+            (let [[left-only in-common left-and-common right-only]
+                  (util/venn-components left-rownames
+                                        right-rownames)
+                  
+                  combined-colnames
+                  (util/vconcat left-colnames right-colnames)
+
+                  combined-columns
+                  (cmb-cols-vt (cmb-cols-hr (dfu/col-vectors (dfu/$ left nil left-only))
+                                            (dfu/nil-cols (dfu/ncol right) (count left-only)))
+                               (cmb-cols-hr (dfu/col-vectors (dfu/$ left nil in-common))
+                                            (dfu/col-vectors (dfu/$ right nil in-common)))
+                               (cmb-cols-hr (dfu/nil-cols (dfu/ncol left) (count right-only))
+                                            (dfu/col-vectors (dfu/$ right nil right-only))))
+                  
+                  combined-rownames
+                  (util/vconcat left-only in-common right-only)]
+              
+              (dfu/$ (new-dataframe combined-colnames
+                                    combined-columns
+                                    combined-rownames)
+                     nil
+                     (concat left-and-common right-only)))
+
+            ;; if one or none of the DFs have rownames
+            (do
+              (assert equal-nrow
+                      "conj-cols: if both dataframes do not each have rownames, the two dataframes must have the same number of rows.")
+              (let [combined-colnames (util/vconcat left-colnames
+                                                    right-colnames)
+                    
+                    combined-columns (util/vconcat (dfu/col-vectors left)
+                                                   (dfu/col-vectors right))
+                    
+                    ;; at this point we know it is not true that both DFs have rownames
+                    ;; so use the one that has them.  Or nil if neither has them.
+                    use-rownames (if (dfu/rownames left)
+                                   (dfu/rownames left)
+                                   (dfu/rownames right))
+                    
+                    [left-only in-common left-and-common right-only]
+                    (util/venn-components left-colnames
+                                          right-colnames)]
+
+                (new-dataframe combined-colnames
+                               combined-columns
+                               use-rownames)))))))
