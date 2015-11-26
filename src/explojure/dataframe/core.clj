@@ -340,55 +340,6 @@
 
 
   
-  (conj-rows
-   [this bottom]
-   (let [top-rownames (dfu/rownames this)
-         bottom-rownames (dfu/rownames bottom)
-
-         top-has-rownames (not (nil? top-rownames))
-         bottom-has-rownames (not (nil? bottom-rownames))
-
-         both-have-rownames (and top-has-rownames
-                                 bottom-has-rownames)
-         both-no-rownames (and (not top-has-rownames)
-                               (not bottom-has-rownames))
-         
-         rowname-conflicts (s/intersection (set top-rownames)
-                                           (set bottom-rownames))]
-     
-     (assert (or both-have-rownames both-no-rownames)
-             (str "conj-rows: DataFrames must both have rownames, or they must both not have rownames in order to maintain the integrity of rowname semantics."))
-     (assert (= (count rowname-conflicts) 0)
-             (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge-frames) if appropriate."))
-
-       (let [top-colnames (dfu/colnames this)
-             bottom-colnames (dfu/colnames bottom)
-
-             [top-only in-common top-and-common bottom-only] (util/venn-components top-colnames
-                                                                              bottom-colnames)
-             cmb-colnames (util/vconcat top-only in-common bottom-only)
-             
-             cmb-columns (cmb-cols-vt
-                          (cmb-cols-hr (dfu/col-vectors (dfu/$ this top-only nil))
-                                           (dfu/col-vectors (dfu/$ this in-common nil))
-                                           (dfu/nil-cols (count bottom-only)
-                                                     (dfu/nrow this)))
-                          (cmb-cols-hr (dfu/nil-cols (count top-only)
-                                                     (dfu/nrow bottom))
-                                           (dfu/col-vectors (dfu/$ bottom in-common nil))
-                                           (dfu/col-vectors (dfu/$ bottom bottom-only nil))))
-             
-             cmb-rownames (if both-have-rownames
-                            (util/vconcat top-rownames
-                                          bottom-rownames)
-                            nil)]
-         
-         (dfu/$ (new-dataframe cmb-colnames
-                           cmb-columns
-                           cmb-rownames)
-            (concat top-and-common bottom-only)
-            nil))))
-
   (merge-frames
    [this right resolution-fn]
    (let [left-colnames (dfu/colnames this)
@@ -540,13 +491,15 @@
                    vecs)))
 
 (defn conj-cols [left right]
-  (cond (or (nil? left)
+  (cond (or (nil? right)
+            (= (dfu/ncol right) 0))
+        left
+
+        (or (nil? left)
             (= (dfu/ncol left) 0))
         right
         
-        (or (nil? right)
-            (= (dfu/ncol right) 0))
-        left
+
 
         :default
         (let [left-colnames (dfu/colnames left)
@@ -617,3 +570,64 @@
                 (new-dataframe combined-colnames
                                combined-columns
                                use-rownames)))))))
+
+(defn conj-rows [top bottom]
+  (cond (or (nil? bottom)
+            (= (dfu/ncol bottom) 0))
+        top
+
+        (or (nil? top)
+            (= (dfu/ncol top) 0))
+        bottom
+
+        :default
+        (let [top-rownames (dfu/rownames top)
+              bottom-rownames (dfu/rownames bottom)
+              
+              top-has-rownames (not (nil? top-rownames))
+              bottom-has-rownames (not (nil? bottom-rownames))
+
+              both-have-rownames (and top-has-rownames
+                                      bottom-has-rownames)
+              both-no-rownames (and (not top-has-rownames)
+                                    (not bottom-has-rownames))
+              
+              rowname-conflicts (s/intersection (set top-rownames)
+                                                (set bottom-rownames))]
+          
+          (assert (or both-have-rownames both-no-rownames)
+                  (str "conj-rows: DataFrames must both have rownames, or they must both not have rownames in order to maintain the integrity of rowname semantics."))
+          (when both-have-rownames
+            (assert (= (count rowname-conflicts) 0)
+                    (str "conj-rows: rownames must be free of conflicts (" rowname-conflicts "). Consider using (merge-frames) if appropriate.")))
+
+          (let [top-colnames (dfu/colnames top)
+                bottom-colnames (dfu/colnames bottom)
+
+                [top-only in-common top-and-common bottom-only]
+                (util/venn-components top-colnames
+                                      bottom-colnames)
+                cmb-colnames (util/vconcat top-only in-common bottom-only)
+                
+                cmb-columns (cmb-cols-vt
+                             (cmb-cols-hr (dfu/col-vectors (dfu/$ top top-only nil))
+                                          (dfu/col-vectors (dfu/$ top in-common nil))
+                                          (dfu/nil-cols (count bottom-only)
+                                                        (dfu/nrow top)))
+                             (cmb-cols-hr (dfu/nil-cols (count top-only)
+                                                        (dfu/nrow bottom))
+                                          (dfu/col-vectors (dfu/$ bottom in-common nil))
+                                          (dfu/col-vectors (dfu/$ bottom bottom-only nil))))
+                
+                cmb-rownames (if both-have-rownames
+                               (util/vconcat top-rownames
+                                             bottom-rownames)
+                               nil)]
+            
+            (dfu/$ (new-dataframe cmb-colnames
+                                  cmb-columns
+                                  cmb-rownames)
+                   (concat top-and-common bottom-only)
+                   nil))))
+  )
+
