@@ -1,10 +1,11 @@
 (ns explojure.io
-  (require [explojure.dataframe.core :as dataframe]
-           [explojure.dataframe.util :as dfu]
-           [explojure.util :as util]
+  (:require [explojure.dataframe.core :as dataframe]
+            [explojure.dataframe.util :as dfu]
+            [explojure.util :as util]
+            
+            [clojure.java.io :as io])
 
-           [clojure.data.csv :as csv]
-           [clojure.java.io :as io]))
+  (:import [org.apache.commons.csv CSVParser CSVFormat]))
 
 (def empty-string "")
 (def null-vals (set [empty-string "na" "nan" "null" "nil"]))
@@ -52,52 +53,26 @@
       (csv/write-csv writer (concat [header] rows)))))
 
 
-(defn read-csv
-  "Read CSV file row-chunks rows at a time."
-  
-  ([f]
-   (read-csv f 10000))
-  
-  ([f row-chunks]
-   (with-open [reader (io/reader f)]
-     (let [csv-seq (csv/read-csv reader)
-           headers (sequence types-xf (first csv-seq))
-           columns (loop [output-cols (repeatedly (count headers) #(vector))
-                          remaining-rows (rest csv-seq)]
-                     (if (seq remaining-rows)
-                       (recur (map concat
-                                   output-cols
-                                   (util/rows->cols (take row-chunks remaining-rows)))
-                              (drop row-chunks remaining-rows))
-                       (map vec
-                            (mapv #(sequence types-xf %) output-cols))))]
-       (dataframe/new-dataframe (vec headers)
-                                (vec columns))))))
+(defn- record-seq [reader parser i-seq]
+  (lazy-seq
+   (cons (vec (seq (first i-seq)))
+         (if (next i-seq)
+           (record-seq reader parser (next i-seq))
+           (do
+             (.close parser)
+             (.close reader)
+             nil)))))
 
+(defprotocol Read-CSV
+  (read-csv [input]))
 
-(defn read-csv-lazy
-  "Keeping this around for historical reasons at the moment.  Prefer read-csv."
-  [f]
-  ;; for now, assuming at least that each CSV file has a header row
-  (with-open [reader (io/reader f)]
-    (let [csv-seq (csv/read-csv reader)
-          headers (first csv-seq)
-          rows (rest csv-seq)
-          col-ct (count headers)
-          cols (vec (repeatedly col-ct #(vector)))]
-      (loop [cols cols
-           rows rows]
-        (if (seq rows)
-          (recur (loop [cols cols
-                        i 0
-                        row-vals (sequence types-xf (first rows))]
-                   (if (seq row-vals)
-                     (let [col-vals (get cols i)]
-                       (recur (assoc cols i (conj col-vals (first row-vals)))
-                              (inc i)
-                              (rest row-vals)))
-                     cols))
-                 (rest rows))
-          (dataframe/new-dataframe headers
-                                   (vec cols)))))))
+(extend-protocol Read-CSV
+  String
+  (read-csv [s]
+    (read-csv (clojure.java.io/reader s)))
+  
+  Reader
+  (read-csv [reader]
+    (let [parser (.parse CSVFormat/DEFAULT reader)]
+      (record-seq reader parser (seq parser)))))
 
