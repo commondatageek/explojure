@@ -1,6 +1,6 @@
 # explojure
 
-A Clojure library designed to ... well, that part is up to you.
+A simple, solid library for data munging in Clojure.
 
 ## Usage
 
