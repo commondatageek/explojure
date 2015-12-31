@@ -1,76 +1,132 @@
-(ns explojure.dataframe.join
-  (:require [explojure.dataframe.util :as dfu]
-            [explojure.util :as util]
-            
-            [clojure.set :as set]))
+(ns explojure.dataframe.join2
+  (:require [explojure.dataframe.core :as df]
+            [explojure.dataframe.util :as dfu]
+            [explojure.util :as u]
+            [clojure.set :as s]))
 
-(defn row-indices
-  "For each x in xs, return [x i], where i is the 0-based index."
-  [xs]
-  (map vector
-       xs
-       (range (count xs))))
-
-(defn gen-key-row-lookup
-  "Create a hash-map for keys => [indices]."
-  [ri]
-  (reduce (fn [m [k i]]
-            (assoc m k (conj (get m k [])
-                             i)))
+(defn generate-index [df on]
+  (reduce (fn [m [i k]]
+            (assoc m k (conj (get m k []) i)))
           {}
-          ri))
+          (map-indexed vector
+                       (dfu/row-vectors
+                        (dfu/$ df on nil)))))
 
-(defn join-selections
-  "Return the row selection indices for a full outer join."
-  [left-keys right-keys]
-  (let [components (util/venn-components left-keys right-keys)
-        [left-only in-common left-and-common right-only] components
-      
-        left-lkp (gen-key-row-lookup (row-indices left-keys))
-        right-lkp (gen-key-row-lookup (row-indices right-keys))
-        
-        ;; get left- and right-only rows
-        left-only-sel (flatten
-                             (map #(get left-lkp %)
-                                  (util/unique left-only)))
-        right-only-sel (flatten
-                              (map #(get right-lkp %)
-                                   (util/unique right-only)))
+(defn nil-df [cols nrows]
+  (let [ncols     (count cols)
+        empty-col (u/vrepeat nrows nil)]
+    (df/new-dataframe cols (u/vrepeat ncols empty-col))))
 
-        ;; get in-common rows
-        [left-common-sel right-common-sel]
-        (reduce (fn [[lefts rights] k]
-                  (let [lt (get left-lkp k)
-                        lt-ct (count lt)
-                        rt (get right-lkp k)
-                        rt-ct (count rt)]
-                    [(concat lefts
-                             (flatten
-                              (map #(repeat rt-ct %)
-                             lt)))
-                     (concat rights
-                             (flatten
-                              (repeat lt-ct rt)))]))
-                [[] []]
-                (util/unique in-common))]
-    
-    [left-only-sel
-     left-common-sel
-     right-common-sel
-     right-only-sel]))
+(defmulti  avoid-collision (fn [c sfx] (type c)))
+(defmethod avoid-collision clojure.lang.Keyword   [c sfx] (keyword (str (name c) "-" sfx)))
+(defmethod avoid-collision java.lang.String       [c sfx] (str c "_" sfx))
 
-(defn avoid-collisions [l-join r-join l r]
-  (let [l-non-join (set/difference (set l) (set l-join))
-        r-non-join (set/difference (set r) (set r-join))
-        collisions (set/intersection l-non-join r-non-join)
-        repl-fn (fn [suff]
-                  (reduce (fn [repl-map col]
-                            (assoc repl-map
-                                   col
-                                   (if (keyword? col)
-                                     (keyword (str (name col) suff))
-                                     (str col suff))))
-                          (hash-map)
-                          collisions))]
-    [(repl-fn "_x")
-     (repl-fn "_y")]))
+(defn- rename-strategy [left-colnames right-colnames on-l on-r]
+  ;; don't care about columns that don't have conflicts.
+
+  ;; for those that do, we need to consider these 4 cases
+  ;;  - neither is a join column                            => rename c_x, c_y
+  ;;  - one is a join column, one is not                    => rename c_x, c_y
+  ;;  - both are join columns, but not the same join column => rename c_x, c_y
+  ;;  - both are join columns, both are the same            => use only left values for
+  ;;                                                           left-only, in-common, and
+  ;;                                                           right values for right-only
+
+  ;; FIXME - This isn't going to work for number column names.
+  ;; FIXME - joins might have problems if one DF has keyword colnames and the other has strings
+  (let [same-keys (set (u/filter-ab #(apply = %)
+                                    (map vector on-l on-r)
+                                    on-l))
+        collisions (remove same-keys
+                           (s/intersection (set left-colnames)
+                                           (set right-colnames)))
+        gen-rnm-map (fn [collisions sfx]
+                      (reduce (fn [m [old new]]
+                                (assoc m old new))
+                              {}
+                              (map vector
+                                   collisions
+                                   (map #(avoid-collision % sfx) collisions))))]
+    [(vec same-keys)
+     (gen-rnm-map collisions "x")
+     (gen-rnm-map collisions "y")]))
+
+(defn- get-outer-indices [idx keys]
+  (->> (map idx keys) (flatten) (sort)))
+
+(defn- get-inner-indices [lt-idx rt-idx inner-k]
+  (let [inner-i (sort-by first
+                         (reduce concat
+                                 (map #(u/cart-prod (lt-idx %)
+                                                    (rt-idx %))
+                                      inner-k)))]
+    [(u/vmap first inner-i)
+     (u/vmap second inner-i)]))
+
+(defn join
+  ([left right on join-type]
+   (join left on right on join-type))
+
+  ([left on-l right on-r join-type]
+   {:pre [(every? #(contains? (set (dfu/colnames left)) %) on-l)
+          (every? #(contains? (set (dfu/colnames right)) %) on-r)
+          (contains? #{:inner :left :right :outer} join-type)]}
+   (let [;; get index of which keys are on which rows
+         lt-idx (generate-index left on-l)
+         rt-idx (generate-index right on-r)
+         
+         ;; key sets
+         [lt-outer-k inner-k _ rt-outer-k]
+         (u/venn-components (keys lt-idx) (keys rt-idx))
+         
+         ;; get selection row indices
+          lt-outer-i  (get-outer-indices lt-idx lt-outer-k)
+         [lt-inner-i
+          rt-inner-i] (get-inner-indices lt-idx rt-idx inner-k)
+          rt-outer-i  (get-outer-indices rt-idx rt-outer-k)
+
+         ;; given join-type, which outer sets to use in the final result?
+         join-sets (get {:inner #{          :inner          }
+                          :left  #{:lt-outer :inner          }
+                          :right #{          :inner :rt-outer}
+                          :outer #{:lt-outer :inner :rt-outer}}
+                         join-type)
+
+         ;; find out which key columns are common between left and right
+         ;; get rename maps for left and right
+         [same-keys rnm-l rnm-r],
+         (rename-strategy (dfu/colnames left)
+                          (dfu/colnames right)
+                          on-l
+                          on-r)]
+
+
+     (df/conj-cols (as-> (reduce df/conj-rows
+                                 [(when (join-sets :lt-outer)
+                                    (dfu/$ left nil lt-outer-i))
+                                  (when (join-sets :inner)
+                                    (dfu/$ left nil lt-inner-i))
+                                  (when (join-sets :rt-outer)
+                                    (as-> (nil-df (dfu/colnames left)
+                                                  (count rt-outer-i))
+                                        ln
+                                      (dfu/set-col ln
+                                                   (apply hash-map
+                                                          (interleave same-keys
+                                                                      (map #(dfu/$ right % rt-outer-i)
+                                                                           same-keys))))))])
+                       %
+                     (dfu/rename-col % rnm-l))
+                   
+                   (as-> (reduce df/conj-rows
+                                 [(when (join-sets :lt-outer)
+                                    (nil-df (dfu/colnames right)
+                                            (count lt-outer-i)))
+                                  (when (join-sets :inner)
+                                    (dfu/$ right nil rt-inner-i))
+                                  (when (join-sets :rt-outer)
+                                    (dfu/$ right nil rt-outer-i))])
+                       %
+                     (dfu/rename-col % rnm-r)
+                     (dfu/$- % same-keys nil))))))
+

@@ -154,7 +154,9 @@
      (new-dataframe colnames
                     (vec (for [c columns]
                            (util/vmap c rows)))
-                    (util/vmap rownames rows))))
+                    (if rownames
+                      (util/vmap rownames rows)
+                      nil))))
 
   ($
    [this col-spec]
@@ -569,8 +571,7 @@
                                   cmb-columns
                                   cmb-rownames)
                    (concat top-and-common bottom-only)
-                   nil))))
-  )
+                   nil)))))
 
 (defn merge-frames [df1 df2 resolution-fn]
   (cond (or (nil? df2)
