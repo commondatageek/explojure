@@ -323,35 +323,20 @@ primarily for side effects."
     false true
     false))
 
-(defn vconcat
-  "Like concat, but ensure vector output."
-  [& args]
-  (vec (apply concat args)))
+(defmacro gen-v-fns [fns]
+  (vec (for [f fns]
+         (let [new-f (symbol (str "v" f))
+               doc-str (str "Like " (name f) ", but ensure vector (non-lazy) output.")]
+         `(defn ~new-f ~doc-str
+            [& args#]
+            (vec (apply ~f args#)))))))
 
-(defn vdistinct
-  "Like distinct, but ensure vector output."
-  [& args]
-  (vec (apply distinct args)))
-
-(defn vrange [& args]
-  "Like range, but ensure vector output."
-  (vec (apply range args)))
-
-(defn vmap [& args]
-  "Like map, but ensure vector output."
-  (vec (apply map args)))
-
-(defn vfilter [& args]
-  "like filter, but ensure vector output."
-  (vec (apply filter args)))
-
-(defn vflatten [& args]
-  "Like flatten, but ensure vector output."
-  (vec (apply flatten args)))
-
-(defn vrepeat [& args]
-  "Like repeat, but ensure vector output"
-  (vec (apply repeat args)))
+(gen-v-fns [concat dedupe distinct drop drop-last drop-while
+            filter interleave interpose keep keep-indexed
+            line-seq map map-indexed partition partition-all
+            partition-by pcalls pmap range re-seq reductions
+            remove repeat repeatedly take take-nth take-while
+            tree-seq flatten])
 
 (defn M
   "Shorthand for getting metadata from an object."
