@@ -1,4 +1,4 @@
-(ns explojure.dataframe.validation
+(ns explojure.dataframe.validate
   (:require [explojure.util :as util]
             [clojure.set :as s]
             [clojure.test :as t]))

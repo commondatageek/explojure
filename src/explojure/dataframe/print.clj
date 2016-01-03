@@ -1,7 +1,7 @@
 (ns explojure.dataframe.print
-  (import explojure.dataframe.core.DataFrame
+  (import explojure.dataframe.consruct.DataFrame
           java.util.regex.Matcher)
-  (:require [explojure.dataframe.core :as df-core]
+  (:require [explojure.dataframe.construct :as ctor]
             [explojure.dataframe.util :as dfu]
             [explojure.util :as util]))
 
@@ -47,7 +47,7 @@
 (defn df->str [df]
   (let [colnames (dfu/colnames df)
         columns (dfu/col-vectors df)
-        new-df (df-core/new-dataframe colnames
+        new-df (ctor/new-dataframe colnames
                                       (util/vmap (fn [col]
                                                    (let [mx-wd (max-width col)
                                                          wd (min mx-wd 30)]
@@ -70,7 +70,7 @@
 
 
 ;; to make DataFrames display correctly at the REPL
-(defmethod print-method explojure.dataframe.core.DataFrame [x ^java.io.Writer w]
+(defmethod print-method explojure.dataframe.construct.DataFrame [x ^java.io.Writer w]
   (.write w (df->str x)))
 
 ;; print a dataframe

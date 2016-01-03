@@ -1,14 +1,15 @@
-(ns explojure.dataframe.specifiers
+(ns explojure.dataframe.impl.select.specify
   (:require [explojure.dataframe.util :as dfu]
+            [explojure.dataframe.impl.get :as raw]
             [explojure.util :as util]))
 
 (declare interpret-spec)
 
-(defn interpret-nil-spec [df axis nl] nil)
+(defn interpret-nil-spec [^explojure.dataframe.construct.DataFrame df axis nl] nil)
 
-(defn interpret-empty-spec [df axis mpt] [])
+(defn interpret-empty-spec [^explojure.dataframe.construct.DataFrame df axis mpt] [])
 
-(defn interpret-fn-spec [df axis f]
+(defn interpret-fn-spec [^explojure.dataframe.construct.DataFrame df axis f]
   (when (not= (count f) 1)
     (throw (new Exception "Only one function can be passed per specifier.")))
   (let [f (first f)]
@@ -16,24 +17,24 @@
                     axis
                     (map boolean
                          (map f (case axis
-                                  :cols (dfu/col-vectors df)
-                                  :rows (dfu/row-vectors df)))))))
+                                  :cols (raw/col-vectors df)
+                                  :rows (raw/row-vectors df)))))))
 
-(defn interpret-int-spec [df axis ints]
-  (let [n (dfu/lookup-names df axis ints)]
+(defn interpret-int-spec [^explojure.dataframe.construct.DataFrame df axis ints]
+  (let [n (raw/lookup-names df axis ints)]
     (if (util/no-nil? n)
       n
       ints)))
 
-(defn interpret-bool-spec [df axis bools]
+(defn interpret-bool-spec [^explojure.dataframe.construct.DataFrame df axis bools]
   (when (not= (count bools) (case axis
-                              :cols (dfu/ncol df)
-                              :rows (dfu/nrow df)))
+                              :cols (raw/ncol df)
+                              :rows (raw/nrow df)))
     (throw (new Exception "Boolean specifiers must have length equal to ncol or nrow.")))
   (util/where bools))
 
-(defn interpret-name-spec [df axis names]
-  (let [n (dfu/lookup-names df axis names)]
+(defn interpret-name-spec [^explojure.dataframe.construct.DataFrame df axis names]
+  (let [n (raw/lookup-names df axis names)]
     (if (util/no-nil? n)
       n
       (throw
@@ -48,7 +49,7 @@
 
 ;; TODO: This conditional code looks brittle to me.
 ;;   Think about if there is a better way to do this.
-(defn interpret-spec [df axis spec]
+(defn interpret-spec [^explojure.dataframe.construct.DataFrame df axis spec]
   (cond
     ;; handle nils
     (nil? spec)
