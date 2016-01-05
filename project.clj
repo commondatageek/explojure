@@ -1,4 +1,4 @@
-(defproject explojure "0.5.0"
+(defproject explojure "0.6.0"
   :description "A simple, solid library for data munging in Clojure."
   :url "http://github.com/aaronj1331/explojure"
   :lein-release {:scm :git
