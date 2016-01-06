@@ -1,9 +1,9 @@
 (ns explojure.dataframe.print
-  (import explojure.dataframe.consruct.DataFrame
-          java.util.regex.Matcher)
   (:require [explojure.dataframe.construct :as ctor]
-            [explojure.dataframe.util :as dfu]
-            [explojure.util :as util]))
+            [explojure.dataframe.impl.get :as get]
+            [explojure.util :as util])
+  (:import explojure.dataframe.construct.DataFrame
+           java.util.regex.Matcher))
 
 (defn sp [x] (str " " x " "))
 (defn qu [x] (str "\"" x "\""))
@@ -45,8 +45,8 @@
 
 ;; here's the magic to converta dataframe to textual format
 (defn df->str [df]
-  (let [colnames (dfu/colnames df)
-        columns (dfu/col-vectors df)
+  (let [colnames (get/colnames df)
+        columns (get/col-vectors df)
         new-df (ctor/new-dataframe colnames
                                       (util/vmap (fn [col]
                                                    (let [mx-wd (max-width col)
@@ -56,7 +56,7 @@
                                                  (util/vmap #(util/vflatten (vector %1 %2))
                                                             colnames
                                                             columns)))
-        rows (dfu/row-vectors new-df)]
+        rows (get/row-vectors new-df)]
     (let [headers (first rows)
           data-rows (rest rows)
           header-line (col-dividers headers)]
