@@ -34,7 +34,7 @@
     (lazy-seq)
     (letfn [(row-fn
               [i]
-              (apply vector (for [c (columns)] (c i))))
+              (apply vector (for [c (columns this)] (c i))))
             
             (rcr-fn
               [rows]
