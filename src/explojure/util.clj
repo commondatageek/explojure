@@ -410,3 +410,13 @@ primarily for side effects."
                            []
                            right)]
     [left-only in-common left-and-common right-only]))
+
+(defn index-seq
+  "For a given sequence, return a map giving unique values and their
+  zero-based location in the sequence."
+  [s]
+  {:pre [(sequential? s)]}
+  (reduce (fn [m [i k]]
+            (assoc m k (conj (get m k []) i)))
+          {}
+          (map-indexed vector (seq s))))
