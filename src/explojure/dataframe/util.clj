@@ -27,8 +27,12 @@
 (defn equal-length?
   "REturn true if every sequence x in xs has the same count. Will cause lazy sequences to be evaluated."
   [xs]
-  {:pre [(every? sequential? xs)]}
-  (apply = (map count xs)))
+  (if (or (nil? xs)
+          (= (count xs) 0))
+    true
+    (do
+      (assert (sseq? xs))
+      (apply = (map count xs)))))
 
 (defn cmb-cols-vt
   [& args]
