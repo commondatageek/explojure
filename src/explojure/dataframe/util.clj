@@ -34,18 +34,36 @@
       (assert (sseq? xs))
       (apply = (map count xs)))))
 
-(defn cmb-cols-vt
-  [& args]
-  {:pre [(every? sseq? args)
-         (equal-length? args)
-         (every? equal-length? args)]}
-  (util/vmap util/vflatten
-             (apply util/vmap vector args)))
+(defn cmb-cols-vt [top bottom]
+  {:pre [(or (nil? top) (sequential? top))
+         (or (nil? bottom) (sequential? bottom))]}
+  (cond (and (nil? top) (nil? bottom)) nil
+        (nil? top)                     bottom
+        (nil? bottom)                  top
+        
+        :default
+        (do (assert (sseq? top))
+            (assert (sseq? bottom))
+            (assert (equal-length? top))
+            (assert (equal-length? bottom))
+            (assert (= (count top) (count bottom)))
+            (util/vmap util/vconcat
+                       top
+                       bottom))))
 
-(defn cmb-cols-hr [& args]
-  {:pre [(every? sseq? args)
-         (every? equal-length? args)]}
-  (apply util/vconcat args))
+(defn cmb-cols-hr [left right]
+  ;; only accept nils or sequentials
+  {:pre [(or (nil? left) (sequential? left))
+         (or (nil? right) (sequential? right))]}
+  (cond (and (nil? left) (nil? right)) nil
+        (nil? left)                    right
+        (nil? right)                   left
+        
+        :default
+        (do (assert (sseq? left))
+            (assert (sseq? right))
+            (assert (equal-length? (concat left right)))
+            (util/vconcat left right))))
 
 (defn collate-keyvals [keyvals]
   {:pre [(sseq? keyvals)

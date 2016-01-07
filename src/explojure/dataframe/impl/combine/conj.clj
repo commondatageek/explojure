@@ -49,12 +49,13 @@
                   (util/vconcat left-colnames right-colnames)
 
                   combined-columns
-                  (dfu/cmb-cols-vt (dfu/cmb-cols-hr (raw/col-vectors (sel/$ left nil left-only))
-                                                    (dfu/nil-cols (raw/ncol right) (count left-only)))
-                                   (dfu/cmb-cols-hr (raw/col-vectors (sel/$ left nil in-common))
-                                                    (raw/col-vectors (sel/$ right nil in-common)))
-                                   (dfu/cmb-cols-hr (dfu/nil-cols (raw/ncol left) (count right-only))
-                                                    (raw/col-vectors (sel/$ right nil right-only))))
+                  (reduce dfu/cmb-cols-vt
+                          [(dfu/cmb-cols-hr (raw/col-vectors (sel/$ left nil left-only))
+                                            (dfu/nil-cols (raw/ncol right) (count left-only)))
+                           (dfu/cmb-cols-hr (raw/col-vectors (sel/$ left nil in-common))
+                                            (raw/col-vectors (sel/$ right nil in-common)))
+                           (dfu/cmb-cols-hr (dfu/nil-cols (raw/ncol left) (count right-only))
+                                            (raw/col-vectors (sel/$ right nil right-only)))])
                   
                   combined-rownames
                   (util/vconcat left-only in-common right-only)]
@@ -128,15 +129,17 @@
                                       bottom-colnames)
                 cmb-colnames (util/vconcat top-only in-common bottom-only)
                 
-                cmb-columns (dfu/cmb-cols-vt
-                             (dfu/cmb-cols-hr (raw/col-vectors (sel/$ top top-only nil))
-                                              (raw/col-vectors (sel/$ top in-common nil))
-                                              (dfu/nil-cols (count bottom-only)
-                                                            (raw/nrow top)))
-                             (dfu/cmb-cols-hr (dfu/nil-cols (count top-only)
-                                                            (raw/nrow bottom))
-                                              (raw/col-vectors (sel/$ bottom in-common nil))
-                                              (raw/col-vectors (sel/$ bottom bottom-only nil))))
+                cmb-columns
+                (dfu/cmb-cols-vt (reduce dfu/cmb-cols-hr
+                                         [(raw/col-vectors (sel/$ top top-only nil))
+                                          (raw/col-vectors (sel/$ top in-common nil))
+                                          (dfu/nil-cols (count bottom-only)
+                                                        (raw/nrow top))])
+                                 (reduce dfu/cmb-cols-hr
+                                         [(dfu/nil-cols (count top-only)
+                                                        (raw/nrow bottom))
+                                          (raw/col-vectors (sel/$ bottom in-common nil))
+                                          (raw/col-vectors (sel/$ bottom bottom-only nil))]))
                 
                 cmb-rownames (if both-have-rownames
                                (util/vconcat top-rownames
