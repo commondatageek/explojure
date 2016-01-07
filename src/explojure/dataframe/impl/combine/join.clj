@@ -8,14 +8,6 @@
             [explojure.util :as u]
             [clojure.set :as s]))
 
-(defn generate-index [df on]
-  (reduce (fn [m [i k]]
-            (assoc m k (conj (get m k []) i)))
-          {}
-          (map-indexed vector
-                       (raw/row-vectors
-                        (sel/$ df on nil)))))
-
 (defmulti  avoid-collision (fn [c sfx] (type c)))
 (defmethod avoid-collision clojure.lang.Keyword   [c sfx] (keyword (str (name c) "-" sfx)))
 (defmethod avoid-collision java.lang.String       [c sfx] (str c "_" sfx))
@@ -75,8 +67,8 @@
           (every? #(contains? (set (raw/colnames right)) %) on-r)
           (contains? #{:inner :left :right :outer} join-type)]}
    (let [;; get index of which keys are on which rows
-         lt-idx (generate-index left on-l)
-         rt-idx (generate-index right on-r)
+         lt-idx (u/index-seq (raw/row-vectors (sel/$ left on-l nil)))
+         rt-idx (u/index-seq (raw/row-vectors (sel/$ right on-r nil)))
          
          ;; key sets
          [lt-outer-k inner-k _ rt-outer-k]
@@ -105,30 +97,30 @@
 
 
      (cmb-conj/conj-cols (as-> (reduce cmb-conj/conj-rows
-                                 [(when (join-sets :lt-outer)
-                                    (sel/$ left nil lt-outer-i))
-                                  (when (join-sets :inner)
-                                    (sel/$ left nil lt-inner-i))
-                                  (when (join-sets :rt-outer)
-                                    (as-> (ctor/nil-df (raw/colnames left)
-                                                       (count rt-outer-i))
-                                        ln
-                                      (mod/set-col ln
-                                                   (apply hash-map
-                                                          (interleave same-keys
-                                                                      (map #(sel/$ right % rt-outer-i)
-                                                                           same-keys))))))])
-                       %
-                     (mod/rename-col % rnm-l))
-                   
-                   (as-> (reduce cmb-conj/conj-rows
-                                 [(when (join-sets :lt-outer)
-                                    (ctor/nil-df (raw/colnames right)
-                                                 (count lt-outer-i)))
-                                  (when (join-sets :inner)
-                                    (sel/$ right nil rt-inner-i))
-                                  (when (join-sets :rt-outer)
-                                    (sel/$ right nil rt-outer-i))])
-                       %
-                     (mod/rename-col % rnm-r)
-                     (sel/$- % same-keys nil))))))
+                                       [(when (join-sets :lt-outer)
+                                          (sel/$ left nil lt-outer-i))
+                                        (when (join-sets :inner)
+                                          (sel/$ left nil lt-inner-i))
+                                        (when (join-sets :rt-outer)
+                                          (as-> (ctor/nil-df (raw/colnames left)
+                                                             (count rt-outer-i))
+                                              ln
+                                            (mod/set-col ln
+                                                         (apply hash-map
+                                                                (interleave same-keys
+                                                                            (map #(sel/$ right % rt-outer-i)
+                                                                                 same-keys))))))])
+                             %
+                           (mod/rename-col % rnm-l))
+                         
+                         (as-> (reduce cmb-conj/conj-rows
+                                       [(when (join-sets :lt-outer)
+                                          (ctor/nil-df (raw/colnames right)
+                                                       (count lt-outer-i)))
+                                        (when (join-sets :inner)
+                                          (sel/$ right nil rt-inner-i))
+                                        (when (join-sets :rt-outer)
+                                          (sel/$ right nil rt-outer-i))])
+                             %
+                           (mod/rename-col % rnm-r)
+                           (sel/$- % same-keys nil))))))
