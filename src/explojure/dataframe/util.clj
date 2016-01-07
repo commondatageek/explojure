@@ -11,10 +11,9 @@
 (defn sseq?
   "Return true if x is a sequence having only sequences (zero ro more) as children"
   [x]
-  (every? identity
-          (concat [(sequential? x)]
-                  (for [el x]
-                    (sequential? el)))))
+  (and (sequential? x)
+       (every? sequential? x)))
+
 (defn truthy? [x]
   (if x true false))
 
