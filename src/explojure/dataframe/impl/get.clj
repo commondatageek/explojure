@@ -2,34 +2,34 @@
   (:require [explojure.dataframe.construct]
             [explojure.util :as util]))
 
-(defn colnames [^explojure.dataframe.construct.DataFrame this]
+(defn colnames [this]
   (.colnames this))
 
-(defn rownames [^explojure.dataframe.construct.DataFrame this]
+(defn rownames [this]
   (.rownames this))
 
-(defn ncol [^explojure.dataframe.construct.DataFrame this]
+(defn ncol [this]
   (.column_ct this))
 
-(defn nrow [^explojure.dataframe.construct.DataFrame this]
+(defn nrow [this]
   (.row_ct this))
 
-(defn columns [^explojure.dataframe.construct.DataFrame this]
+(defn columns [this]
   (.columns this))
 
-(defn colname-idx [^explojure.dataframe.construct.DataFrame this]
+(defn colname-idx [this]
   (.colname_idx this))
 
-(defn rowname-idx [^explojure.dataframe.construct.DataFrame this]
+(defn rowname-idx [this]
   (.rowname_idx this))
 
-(defn col-vectors [^explojure.dataframe.construct.DataFrame this]
+(defn col-vectors [this]
   (map (fn [name c]
          (with-meta c {:name name}))
        (colnames this)
        (columns this)))
   
-(defn row-vectors [^explojure.dataframe.construct.DataFrame this]
+(defn row-vectors [this]
   (if (= (nrow this) 0)
     (lazy-seq)
     (letfn [(row-fn
@@ -43,8 +43,7 @@
                 (lazy-seq (cons (row-fn i) (when (seq remaining) (rcr-fn remaining))))))]
       (rcr-fn (range (nrow this))))))
 
-(defn lookup-names [^explojure.dataframe.construct.DataFrame this
-                    axis xs]
+(defn lookup-names [this axis xs]
   (assert (contains? #{:rows :cols} axis)
           "lookup-names: axis must be either :rows or :cols")
   (let [index (case axis

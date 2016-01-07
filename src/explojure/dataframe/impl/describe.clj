@@ -2,8 +2,7 @@
   (:require [explojure.dataframe.construct :as ctor]
             [explojure.dataframe.impl.get :as raw]))
 
-(defn not-nil
-  [^explojure.dataframe.construct.DataFrame this]
+(defn not-nil [this]
   (ctor/new-dataframe [:column :count]
                       [raw/colnames
                        (vec

@@ -55,14 +55,10 @@
      (u/vmap second inner-i)]))
 
 (defn join-frames
-  ([^explojure.dataframe.construct.DataFrame left
-    ^explojure.dataframe.construct.DataFrame right
-    on join-type]
+  ([left right on join-type]
    (join-frames left on right on join-type))
 
-  ([^explojure.dataframe.construct.DataFrame left on-l
-    ^explojure.dataframe.construct.DataFrame right on-r
-    join-type]
+  ([left on-l right on-r join-type]
    {:pre [(every? #(contains? (set (raw/colnames left)) %) on-l)
           (every? #(contains? (set (raw/colnames right)) %) on-r)
           (contains? #{:inner :left :right :outer} join-type)]}

@@ -5,8 +5,7 @@
             [explojure.dataframe.util :as dfu]
             [explojure.util :as util]))
 
-(defn select-cols-by-index [^explojure.dataframe.construct.DataFrame this
-                            cols]
+(defn select-cols-by-index [this cols]
   (assert (sequential? cols)
           "select-cols-by-index: column indices must be supplied in a sequential collection.")
   (assert (every? integer? cols)
@@ -30,8 +29,7 @@
                           (util/vmap columns cols)
                           rownames))))
   
-(defn select-rows-by-index [^explojure.dataframe.construct.DataFrame this
-                            rows]
+(defn select-rows-by-index [this rows]
   (assert (sequential? rows)
           "select-rows-by-index: row indices must be supplied in a sequential collection.")
   (assert (every? integer? rows)
@@ -56,11 +54,9 @@
                             nil)))))
 
 (defn $
-  ([^explojure.dataframe.construct.DataFrame this
-    col-spec]
+  ([this col-spec]
    ($ this col-spec nil))
-  ([^explojure.dataframe.construct.DataFrame this
-    col-spec row-spec]
+  ([this col-spec row-spec]
    ;; if either or both of the specifiers are nil,
    ;;   don't apply filter to that axis.
    (let [filtered this
@@ -95,8 +91,7 @@
        ;; return single value
        (and (not (spec/multi-specifier? col-spec))
             (not (spec/multi-specifier? row-spec)))
-       (first (first (raw/col-vectors filtered))))))
-)
+       (first (first (raw/col-vectors filtered)))))))
 
   
 
@@ -104,8 +99,7 @@
   ;; TODO: The dropping mechanism in these two functions
   ;;   might be more efficient if we used (remove) instead of
   ;;   our (filter #(not (drop-set %)).
-(defn drop-cols-by-index [^explojure.dataframe.construct.DataFrame this
-                          cols]
+(defn drop-cols-by-index [this cols]
   (assert (sequential? cols)
           "drop-cols-by-index: column indices must be supplied in a sequential collection.")
   (assert (every? integer? cols)
@@ -119,8 +113,7 @@
                           (util/vfilter #(not (drop-set %))
                                         (util/vrange (raw/ncol this))))))
   
-(defn drop-rows-by-index [^explojure.dataframe.construct.DataFrame this
-                          rows]
+(defn drop-rows-by-index [this rows]
   (assert (sequential? rows)
           "drop-rows-by-index: row indices must be supplied in a sequential collection.")
   (assert (every? integer? rows)

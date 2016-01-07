@@ -5,8 +5,7 @@
             [explojure.dataframe.util :as dfu]
             [explojure.util :as util]
 
-            [clojure.set :as s])
-  (:import explojure.dataframe.construct.DataFrame))
+            [clojure.set :as s]))
 
 (defn conj-cols [left right]
   (let [lt-nil (or (nil? left) (= (raw/ncol left) 0))
@@ -83,8 +82,7 @@
                                       combined-columns
                                       use-rownames))))))))
 
-(defn conj-rows [^explojure.dataframe.construct.DataFrame top
-                 ^explojure.dataframe.construct.DataFrame bottom]
+(defn conj-rows [top bottom]
   (cond (or (nil? bottom)
             (= (raw/ncol bottom) 0))
         top

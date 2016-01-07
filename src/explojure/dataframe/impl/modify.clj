@@ -3,8 +3,7 @@
             [explojure.dataframe.impl.get :as raw]))
 
 (defn add-col
-  ([^explojure.dataframe.construct.DataFrame this
-    colname column]
+  ([this colname column]
    (let [colnames (raw/colnames this)
          existing (set colnames)
          columns  (raw/columns this)
@@ -15,8 +14,7 @@
                          (conj columns column)
                          rownames)))
   
-  ([^explojure.dataframe.construct.DataFrame this
-    add-map]
+  ([this add-map]
    (assert (associative? add-map)
            (str "add-col: add-map must be associative. (Received " (type add-map) ".)"))
    (reduce (fn [d [c v]]
@@ -26,8 +24,7 @@
 
 
 (defn rename-col
-  ([^explojure.dataframe.construct.DataFrame this
-    old-colname new-colname]
+  ([this old-colname new-colname]
    (let [colname-idx (raw/colname-idx this)
          colnames (raw/colnames this)
          columns (raw/columns this)
@@ -41,8 +38,7 @@
                            columns
                            rownames))))
   
-  ([^explojure.dataframe.construct.DataFrame this
-    rename-map]
+  ([this rename-map]
    (assert (associative? rename-map)
            (str "rename-col: rename-map must be associative. (Received " (type rename-map) ".)"))
    (reduce (fn [d [o n]]
@@ -51,8 +47,7 @@
            (seq rename-map))))
 
 (defn replace-col
-  ([^explojure.dataframe.construct.DataFrame this
-    colname column]
+  ([this colname column]
    (let [colname-idx (raw/colname-idx this)
          columns  (raw/columns this)
          colnames (raw/colnames this)
@@ -64,8 +59,7 @@
                            (assoc columns cn-idx column)
                            rownames))))
 
-  ([^explojure.dataframe.construct.DataFrame this
-    replace-map]
+  ([this replace-map]
    (assert (associative? replace-map)
            (str "replace-col: replace-map must be associative. (Received " (type replace-map) ".)"))
    (reduce (fn [d [oc nd]]
@@ -76,15 +70,13 @@
 
 
 (defn set-col
-  ([^explojure.dataframe.construct.DataFrame this
-    colname column]
+  ([this colname column]
    (let [colname-idx (raw/colname-idx this)]
      (if (contains? colname-idx colname)
        (replace-col this colname column)
        (add-col this colname column))))
   
-  ([^explojure.dataframe.construct.DataFrame this
-    set-map]
+  ([this set-map]
    (assert (associative? set-map)
            (str "set-col: set-map must be associative. (Received " (type set-map) ".)"))
    (reduce (fn [df [colname column]]
@@ -92,14 +84,12 @@
            this
            (seq set-map))))
 
-(defn set-colnames [^explojure.dataframe.construct.DataFrame this
-                    new-colnames]
+(defn set-colnames [this new-colnames]
   (ctor/new-dataframe new-colnames
                       (raw/columns this)
                       (raw/rownames this)))
 
-(defn set-rownames [^explojure.dataframe.construct.DataFrame this
-                    new-rownames]
+(defn set-rownames [this new-rownames]
   (ctor/new-dataframe (raw/colnames this)
                       (raw/columns this)
                       new-rownames))

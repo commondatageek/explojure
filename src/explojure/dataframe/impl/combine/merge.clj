@@ -21,9 +21,7 @@
                     (if right right left))})
 
 
-(defn merge-frames [^explojure.dataframe.construct.DataFrame df1
-                    ^explojure.dataframe.construct.DataFrame df2
-                    resolution-fn]
+(defn merge-frames [df1 df2 resolution-fn]
   (cond (or (nil? df2)
             (= (raw/ncol df2) 0))
         df1
