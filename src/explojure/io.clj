@@ -1,6 +1,7 @@
 (ns explojure.io
   (:require [explojure.dataframe.core :as dataframe]
             [explojure.dataframe.util :as dfu]
+            [explojure.dataframe.impl.get :as raw]
             [explojure.util :as util]
             
             [clojure.java.io :as io])
@@ -48,8 +49,8 @@
 
 (defn write-csv [df f]
   (with-open [writer (io/writer f)]
-    (let [header (dfu/colnames df)
-          rows (dfu/row-vectors df)]
+    (let [header (raw/colnames df)
+          rows (raw/row-vectors df)]
       (csv/write-csv writer (concat [header] rows)))))
 
 
