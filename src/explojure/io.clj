@@ -1,12 +1,13 @@
 (ns explojure.io
   (:require [explojure.dataframe.core :as dataframe]
+            [explojure.dataframe.construct :as ctor]
             [explojure.dataframe.util :as dfu]
             [explojure.dataframe.impl.get :as raw]
             [explojure.util :as util]
             
             [clojure.java.io :as io])
 
-  (:import [org.apache.commons.csv CSVParser CSVFormat]))
+  (:import [org.apache.commons.csv CSVParser CSVFormat CSVPrinter]))
 
 (def empty-string "")
 (def null-vals (set [empty-string "na" "nan" "null" "nil"]))
@@ -51,7 +52,7 @@
   (with-open [writer (io/writer f)]
     (let [header (raw/colnames df)
           rows (raw/row-vectors df)]
-      (csv/write-csv writer (concat [header] rows)))))
+      (comment (csv/write-csv writer (concat [header] rows))))))
 
 
 (defn- record-seq [reader parser i-seq]
@@ -72,8 +73,12 @@
   (read-csv [s]
     (read-csv (clojure.java.io/reader s)))
   
-  Reader
+  java.io.Reader
   (read-csv [reader]
-    (let [parser (.parse CSVFormat/DEFAULT reader)]
-      (record-seq reader parser (seq parser)))))
-
+    (let [parser (.parse CSVFormat/DEFAULT reader)
+          records (map #(sequence types-xf %)
+                       (record-seq reader parser (seq parser)))
+          header (vec (first records))
+          rows (next records)]
+      (ctor/new-dataframe header
+                          (util/rows->cols rows)))))
