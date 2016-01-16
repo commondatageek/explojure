@@ -49,10 +49,12 @@
                     (map read-keyword)))
 
 (defn write-csv [df f]
-  (with-open [writer (io/writer f)]
-    (let [header (raw/colnames df)
-          rows (raw/row-vectors df)]
-      (comment (csv/write-csv writer (concat [header] rows))))))
+  (with-open [writer (io/writer f)
+              printer (.print CSVFormat/DEFAULT writer)]
+    (let [records (concat [(raw/colnames df)]
+                          (raw/row-vectors df))]
+      (doseq [r records]
+        (.printRecord printer (into-array Object r))))))
 
 
 (defn- record-seq [reader parser i-seq]
