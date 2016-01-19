@@ -2,6 +2,16 @@
   (:require [explojure.dataframe.construct :as ctor]
             [explojure.dataframe.impl.get :as raw]))
 
+(defn columnize
+  "If value is a sequential, return value unchanged. If value is
+  not sequential then repeat the value to create a vector of
+  appropriate length for the specified dataframe."
+  [df value]
+  
+  (if (not (sequential? value))
+    (vec (repeat (raw/nrow df) value))
+    value))
+
 (defn add-col
   ([this colname column]
    (let [colnames (raw/colnames this)
@@ -11,7 +21,7 @@
      (assert (not (existing colname))
              (str "add-col: column \"" colname "\" already exists"))
      (ctor/new-dataframe (conj colnames colname)
-                         (conj columns column)
+                         (conj columns (columnize this column))
                          rownames)))
   
   ([this add-map]
@@ -54,11 +64,12 @@
          rownames (raw/rownames this)]
      (assert (contains? colname-idx colname)
              (str "replace-col: Cannot replace a column that doesn't exist (" colname ")."))
-     (let [cn-idx (get colname-idx colname)]
-       (ctor/new-dataframe colnames
-                           (assoc columns cn-idx column)
-                           rownames))))
-
+     (ctor/new-dataframe colnames
+                         (assoc columns
+                                (get colname-idx colname)
+                                (columnize this column))
+                         rownames)))
+  
   ([this replace-map]
    (assert (associative? replace-map)
            (str "replace-col: replace-map must be associative. (Received " (type replace-map) ".)"))
