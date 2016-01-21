@@ -105,60 +105,67 @@
   (select-rows-by-index [this rows]
     (sel/select-rows-by-index this rows))
   
-  ($ [this col-spec]
-    (sel/$ this col-spec))
+  ($
+    ([this col-spec]
+     (sel/$ this col-spec))
+    ([this col-spec row-spec]
+     (sel/$ this col-spec row-spec)))
   
-  ($ [this col-spec row-spec]
-    (sel/$ this col-spec row-spec))
-
   (drop-cols-by-index [this cols]
     (sel/drop-cols-by-index this cols))
   
   (drop-rows-by-index [this rows]
     (sel/drop-rows-by-index this rows))
   
-  ($- [this col-spec]
-    (sel/$- this col-spec))
-  
-  ($- [this col-spec row-spec]
-    (sel/$- this col-spec row-spec))
+  ($-
+    ([this col-spec]
+     (sel/$- this col-spec))
+    ([this col-spec row-spec]
+     (sel/$- this col-spec row-spec)))
 
   ;; modification
-  (add-col [this colname column]
-    (mod/add-col this colname column))
-  (add-col [this add-map]
-    (mod/add-col this add-map))
+  (add-col
+    ([this colname column]
+     (mod/add-col this colname column))
+    ([this add-map]
+     (mod/add-col this add-map)))
   
-  (rename-col [this old-colname new-colnames]
-    (mod/rename-col this old-colname new-colnames))
-  (rename-col [this rename-map]
-    (mod/rename-col this rename-map))
+  (rename-col
+    ([this old-colname new-colnames]
+     (mod/rename-col this old-colname new-colnames))
+    ([this rename-map]
+     (mod/rename-col this rename-map)))
   
-  (replace-col [this colname column]
-    (mod/replace-col this colname column))
-  (replace-col [this replace-map]
-    (mod/replace-col this replace-map))
+  (replace-col
+    ([this colname column]
+     (mod/replace-col this colname column))
+    ([this replace-map]
+     (mod/replace-col this replace-map)))
   
-  (set-col [this colname column]
-    (mod/set-col this colname column))
-  (set-col [this set-map]
-    (mod/set-col this set-map))
+  (set-col
+    ([this colname column]
+     (mod/set-col this colname column))
+    ([this set-map]
+     (mod/set-col this set-map)))
   
   (set-colnames [this new-colnames]
     (mod/set-colnames this new-colnames))
+
   (set-rownames [this new-rownames]
     (mod/set-rownames this new-rownames))
 
   ;; combination
   (conj-cols [this right]
     (cmb-conj/conj-cols this right))
+
   (conj-rows [this bottom]
     (cmb-conj/conj-rows this bottom))
 
   (merge-frames [this other resolution-fn]
     (cmb-merge/merge-frames [this other resolution-fn]))
 
-  (join-frames [this right on join-type]
-    (cmb-join/join-frames this right on join-type))
-  (join-frames [this left-on right right-on join-type]
-    (cmb-join/join-frames this left-on right right-on join-type)))
+  (join-frames
+    ([this right on join-type]
+     (cmb-join/join-frames this right on join-type))
+    ([this left-on right right-on join-type]
+     (cmb-join/join-frames this left-on right right-on join-type))))
