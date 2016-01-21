@@ -83,4 +83,6 @@
           header (vec (first records))
           rows (next records)]
       (ctor/new-dataframe header
-                          (util/rows->cols rows)))))
+                          (if (= (count rows) 0)
+                            (util/vrepeat (count header) [])
+                            (util/rows->cols rows))))))
