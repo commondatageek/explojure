@@ -43,14 +43,14 @@
      (gen-rnm-map collisions "y")]))
 
 (defn- get-outer-indices [idx keys]
-  (->> (map idx keys) (flatten) (sort)))
+  (->> (u/vmap idx keys) (u/vflatten) (sort)))
 
 (defn- get-inner-indices [lt-idx rt-idx inner-k]
   (let [inner-i (sort-by first
-                         (reduce concat
-                                 (map #(u/cart-prod (lt-idx %)
-                                                    (rt-idx %))
-                                      inner-k)))]
+                         (reduce u/vconcat
+                                 (u/vmap #(u/cart-prod (lt-idx %)
+                                                       (rt-idx %))
+                                         inner-k)))]
     [(u/vmap first inner-i)
      (u/vmap second inner-i)]))
 
@@ -103,9 +103,9 @@
                                               ln
                                             (mod/set-col ln
                                                          (apply hash-map
-                                                                (interleave same-keys
-                                                                            (map #(sel/$ right % rt-outer-i)
-                                                                                 same-keys))))))])
+                                                                (u/vinterleave same-keys
+                                                                               (u/vmap #(sel/$ right % rt-outer-i)
+                                                                                       same-keys))))))])
                              %
                            (mod/rename-col % rnm-l))
                          
