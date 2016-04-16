@@ -416,7 +416,9 @@ primarily for side effects."
   zero-based location in the sequence."
   [s]
   {:pre [(sequential? s)]}
-  (reduce (fn [m [i k]]
-            (assoc m k (conj (get m k []) i)))
-          {}
-          (map-indexed vector (seq s))))
+  (persistent!
+   (reduce (fn [m [i k]]
+             (assoc! m k (conj (get m k []) i)))
+           (transient {})
+           (map-indexed vector (seq s)))))
+
