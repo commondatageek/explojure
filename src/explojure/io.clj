@@ -76,13 +76,17 @@
     (read-csv (clojure.java.io/reader s)))
   
   java.io.Reader
-  (read-csv [reader]
+  (read-csv [reader & {:keys [header] :or [header true]}]
     (let [parser (.parse CSVFormat/DEFAULT reader)
           records (map #(sequence types-xf %)
                        (record-seq reader parser (seq parser)))
-          header (vec (first records))
-          rows (next records)]
-      (ctor/new-dataframe header
+          header-vals (if header
+                        (vec (first records))
+                        (vec (range (count (first records)))))
+          rows (if header
+                 (next records)
+                 records)]
+      (ctor/new-dataframe header-vals
                           (if (= (count rows) 0)
-                            (util/vrepeat (count header) [])
+                            (util/vrepeat (count header-vals) [])
                             (util/rows->cols rows))))))
