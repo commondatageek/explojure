@@ -149,3 +149,24 @@
                     (let [row-indices (spec/interpret-spec this :rows row-spec)]
                       (drop-rows-by-index filtered row-indices)))]
      filtered)))
+
+(defn drop-duplicates
+  ([this]
+   (drop-duplicates this nil first))
+
+  ([this col-spec]
+   (drop-duplicates this col-spec first))
+
+  ([this col-spec keep-fn]
+   (let [col-spec (if (and (not (nil? col-spec))
+                           (not (sequential? col-spec)))
+                    [col-spec]
+                    col-spec)
+         key-map (util/index-seq
+                  (raw/row-vectors
+                   ($ this col-spec)))
+         keep-rows (sort
+                    (flatten
+                     (map keep-fn
+                          (vals key-map))))]
+     ($ this nil keep-rows))))

@@ -55,6 +55,9 @@
   (drop-rows-by-index [this rows])
   ($- [this col-spec]
       [this col-spec row-spec])
+  (drop-duplicates [this]
+                   [this col-spec]
+                   [this col-spec keep-fn])
 
   ;; combine dataframes
   (conj-cols [this right])
@@ -122,6 +125,14 @@
      (sel/$- this col-spec))
     ([this col-spec row-spec]
      (sel/$- this col-spec row-spec)))
+
+  (drop-duplicates
+    ([this]
+     (sel/drop-duplicates this))
+    ([this col-spec]
+     (sel/drop-duplicates this col-spec))
+    ([this col-spec keep-fn]
+     (sel/drop-duplicates this col-spec keep-fn)))
 
   ;; modification
   (add-col
