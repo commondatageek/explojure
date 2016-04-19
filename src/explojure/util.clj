@@ -394,21 +394,24 @@ primarily for side effects."
    from left and right.  For in-common, use left order."
   (let [left-set (set left)
         right-set (set right)
-
         [left-only in-common left-and-common]
-        (reduce (fn [[left-only in-common left-and-common] val]
-                  (if (nil? (get right-set val))
-                    [(conj left-only val) in-common (conj left-and-common val)]
-                    [left-only (conj in-common val) (conj left-and-common val)]))
-                [[] [] []]
-                left)
-
-        right-only (reduce (fn [right-only val]
-                             (if (nil? (get left-set val))
-                               (conj right-only val)
-                               right-only))
-                           []
-                           right)]
+        (map persistent!
+             (reduce (fn [[left-only in-common left-and-common] val]
+                       (if (nil? (get right-set val))
+                         [(conj! left-only val) in-common (conj! left-and-common val)]
+                         [left-only (conj! in-common val) (conj! left-and-common val)]))
+                     [(transient [])
+                      (transient [])
+                      (transient [])]
+                     left))        
+        
+        right-only (persistent!
+                    (reduce (fn [right-only val]
+                              (if (nil? (get left-set val))
+                                (conj! right-only val)
+                                right-only))
+                            (transient [])
+                            right))]
     [left-only in-common left-and-common right-only]))
 
 (defn index-seq
