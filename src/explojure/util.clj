@@ -120,7 +120,11 @@ realized after the first pass."
     ([1 \"a\"] [1 \"b\"] [2 \"a\"] [2 \"b\"] [3 \"a\"] [3 \"b\"])
   "
   [xs ys]
-  (for [x xs, y ys] [x y]))
+  (if (and (= (count xs) 1)
+           (= (count ys) 1))
+    [[(first xs) (first ys)]]
+    (for [x xs, y ys]
+      [x y])))
 
 (defn print-cp
   "Print a list of directories visible from the classpath."
