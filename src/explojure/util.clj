@@ -111,21 +111,6 @@ realized after the first pass."
   [coll]
   (filter-ab coll (range (count coll))))
 
-(defn cart-prod
-  "
-  Given two collections, xs and ys, return a lazy seq of vectors where
-  each vector is one of all possible unique permutations of x and y.
-
-  For example, (cart-prod [1 2 3] [\"a\" \"b\"]) yields:
-    ([1 \"a\"] [1 \"b\"] [2 \"a\"] [2 \"b\"] [3 \"a\"] [3 \"b\"])
-  "
-  [xs ys]
-  (if (and (= (count xs) 1)
-           (= (count ys) 1))
-    [[(first xs) (first ys)]]
-    (for [x xs, y ys]
-      [x y])))
-
 (defn print-cp
   "Print a list of directories visible from the classpath."
   []

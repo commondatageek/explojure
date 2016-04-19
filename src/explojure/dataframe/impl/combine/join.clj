@@ -43,16 +43,28 @@
      (gen-rnm-map collisions "y")]))
 
 (defn- get-outer-indices [idx keys]
-  (->> (u/vmap idx keys) (u/vflatten) (sort)))
+  (->> (u/vmap idx keys) (u/vflatten)))
 
-(defn- get-inner-indices [lt-idx rt-idx inner-k]
-  (let [inner-i (sort-by first
-                         (reduce u/vconcat
-                                 (u/vmap #(u/cart-prod (lt-idx %)
-                                                       (rt-idx %))
-                                         inner-k)))]
-    [(u/vmap first inner-i)
-     (u/vmap second inner-i)]))
+(defn get-inner-indices [lt-idx rt-idx inner-k]
+  (map persistent!
+       (reduce (fn [[result-x result-y] k]
+                 (let [xs (lt-idx k)
+                       ys (rt-idx k)]
+                   (if (and (= (count xs) 1)
+                            (= (count ys) 1))
+                     [(conj! result-x (first xs))
+                      (conj! result-y (first ys))]
+                     (reduce (fn [[result-x result-y] x]
+                               (reduce (fn [[result-x result-y] y]
+                                         [(conj! result-x x)
+                                          (conj! result-y y)])
+                                       [result-x result-y]
+                                       ys))
+                             [result-x result-y]
+                             xs))))
+               [(transient [])
+                (transient [])]
+               inner-k)))
 
 (defn join-frames
   ([left right on join-type]
@@ -72,8 +84,7 @@
          
          ;; get selection row indices
          lt-outer-i  (get-outer-indices lt-idx lt-outer-k)
-         [lt-inner-i
-          rt-inner-i] (get-inner-indices lt-idx rt-idx inner-k)
+         [lt-inner-i rt-inner-i] (get-inner-indices lt-idx rt-idx inner-k)
          rt-outer-i  (get-outer-indices rt-idx rt-outer-k)
 
          ;; given join-type, which outer sets to use in the final result?
@@ -90,7 +101,6 @@
                           (raw/colnames right)
                           on-l
                           on-r)]
-
 
      (cmb-conj/conj-cols (as-> (reduce cmb-conj/conj-rows
                                        [(when (join-sets :lt-outer)
