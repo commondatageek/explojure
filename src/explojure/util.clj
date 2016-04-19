@@ -400,20 +400,20 @@ primarily for side effects."
         right-set (set right)
         [left-only in-common left-and-common]
         (map persistent!
-             (reduce (fn [[left-only in-common left-and-common] val]
-                       (if (nil? (get right-set val))
-                         [(conj! left-only val) in-common (conj! left-and-common val)]
-                         [left-only (conj! in-common val) (conj! left-and-common val)]))
+             (reduce (fn [[left-only in-common left-and-common] v]
+                       (if (right-set v)
+                         [left-only (conj! in-common v) (conj! left-and-common v)]
+                         [(conj! left-only v) in-common (conj! left-and-common v)]))
                      [(transient [])
                       (transient [])
                       (transient [])]
                      left))        
         
         right-only (persistent!
-                    (reduce (fn [right-only val]
-                              (if (nil? (get left-set val))
-                                (conj! right-only val)
-                                right-only))
+                    (reduce (fn [right-only v]
+                              (if (left-set v)
+                                right-only
+                                (conj! right-only v)))
                             (transient [])
                             right))]
     [left-only in-common left-and-common right-only]))
