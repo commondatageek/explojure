@@ -30,18 +30,8 @@
        (columns this)))
   
 (defn row-vectors [this]
-  (if (= (nrow this) 0)
-    (lazy-seq)
-    (letfn [(row-fn
-              [i]
-              (apply vector (for [c (columns this)] (c i))))
-            
-            (rcr-fn
-              [rows]
-              (let [i (first rows)
-                    remaining (next rows)]
-                (lazy-seq (cons (row-fn i) (when (seq remaining) (rcr-fn remaining))))))]
-      (rcr-fn (range (nrow this))))))
+  (apply (partial map vector)
+         (columns this)))
 
 (defn lookup-names [this axis xs]
   (assert (contains? #{:rows :cols} axis)
