@@ -108,8 +108,11 @@ realized after the first pass."
   Notes
    - processes 10,000,000 in approximately 23 seconds
   "
-  [coll]
-  (filter-ab coll (range (count coll))))
+  ([coll]
+   (filter-ab coll
+              (range (count coll))))
+  ([f coll]
+   (where (map f coll))))
 
 (defn print-cp
   "Print a list of directories visible from the classpath."
