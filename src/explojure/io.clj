@@ -68,15 +68,19 @@
              nil)))))
 
 (defprotocol Read-CSV
-  (read-csv [input]))
+  (read-csv [input & {:keys [header]
+                      :or {header true}}]))
 
 (extend-protocol Read-CSV
   String
-  (read-csv [s]
-    (read-csv (clojure.java.io/reader s)))
+  (read-csv [s & {:keys [header]
+                  :or {header true}}]
+    (read-csv (clojure.java.io/reader s)
+              :header header))
   
   java.io.Reader
-  (read-csv [reader & {:keys [header] :or [header true]}]
+  (read-csv [reader & {:keys [header]
+                       :or {header true}}]
     (let [parser (.parse CSVFormat/DEFAULT reader)
           records (map #(sequence types-xf %)
                        (record-seq reader parser (seq parser)))

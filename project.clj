@@ -1,4 +1,4 @@
-(defproject explojure "0.7.0"
+(defproject explojure "0.8.0-SNAPSHOT"
   :description "A simple, solid library for data munging in Clojure."
   :url "http://github.com/aaronj1331/explojure"
   :lein-release {:scm :git
@@ -8,5 +8,11 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.apache.commons/commons-csv "1.2"]
-                 [org.apache.commons/commons-math3 "3.6.1"]])
+                 [org.apache.commons/commons-math3 "3.6.1"]]
+  :repositories [["releases" {:url "s3p://ajohnson/releases"
+                              :username :env
+                              :passphrase :env}]
+                 ["snapshots" {:url "s3p://ajohnson/snapshots"
+                               :username :env
+                               :passphrase :env}]])
 
