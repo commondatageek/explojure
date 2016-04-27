@@ -6,6 +6,9 @@ This change log follows the conventions of
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+- (row-maps) allows to process rows as maps instead of just as vectors
+
 ### Fixed
 - User was actually unable to specify :headers.  Now they should be able.
 

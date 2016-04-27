@@ -26,6 +26,7 @@
 
   (col-vectors [this])
   (row-vectors [this])
+  (row-maps [this])
 
   ;; modify
   (add-col [this colname column]
@@ -92,6 +93,9 @@
   
   (row-vectors [this]
     (raw/row-vectors this))
+
+  (row-maps [this]
+    (raw/row-maps this))
 
   ;; descriptive
   (not-nil [this]

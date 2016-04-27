@@ -33,6 +33,13 @@
   (apply (partial map vector)
          (columns this)))
 
+(defn row-maps [this]
+  (let [keys (colnames this)
+        rows (row-vectors this)]
+    (map (fn [vals]
+           (zipmap keys vals))
+         rows)))
+
 (defn lookup-names [this axis xs]
   (assert (contains? #{:rows :cols} axis)
           "lookup-names: axis must be either :rows or :cols")
