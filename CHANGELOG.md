@@ -7,8 +7,11 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
-- (row-maps) allows to process rows as maps instead of just as vectors
-- (util/where) now accepts a function for transforming the coll.
+- explojuredataframe.core
+    - (row-maps) allows to process rows as maps instead of vectors
+    - (map-col) map a column to a function to create a new column
+- explojure.util
+    - (where) now accepts a function for transforming the coll.
 
 ### Fixed
 - User was actually unable to specify :headers.  Now they should be able.

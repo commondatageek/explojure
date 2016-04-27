@@ -95,6 +95,13 @@
            this
            (seq set-map))))
 
+(defn map-col [this src f dst]
+  (let [colname-idx (raw/colname-idx this)
+        columns  (raw/columns this)]
+    (assert (contains? colname-idx src)
+            (str "map-col: Cannot map a column that doesn't exist (" src ")."))
+    (add-col this dst (mapv f (get columns (get colname-idx src))))))
+
 (defn set-colnames [this new-colnames]
   (ctor/new-dataframe new-colnames
                       (raw/columns this)

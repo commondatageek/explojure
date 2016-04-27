@@ -41,6 +41,8 @@
   (set-col [this colname column]
            [this set-map])
 
+  (map-col [df src f dst])
+
   ;; index modifications
   (set-colnames [this new-colnames])
   (set-rownames [this new-rownames])
@@ -162,6 +164,9 @@
      (mod/set-col this colname column))
     ([this set-map]
      (mod/set-col this set-map)))
+
+  (map-col [this src f dst]
+    (mod/map-col this src f dst))
   
   (set-colnames [this new-colnames]
     (mod/set-colnames this new-colnames))
