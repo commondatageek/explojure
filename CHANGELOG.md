@@ -7,11 +7,16 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
-- explojuredataframe.core
+- explojure.dataframe.core
     - (row-maps) allows to process rows as maps instead of vectors
     - (map-col) map a column to a function to create a new column
 - explojure.util
     - (where) now accepts a function for transforming the coll.
+
+### Optimized
+- explojure.util
+    - (rows->cols) is now MUCH faster.  Went from polynomial time complexity
+      to linear time complexity.
 
 ### Fixed
 - User was actually unable to specify :headers.  Now they should be able.

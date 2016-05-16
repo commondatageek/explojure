@@ -8,13 +8,19 @@ not as well."
   `(-> ~x ~@(for [f forms] `((fn [~'%] ~f)))))
 
 (defn rows->cols
-  "Convert [[1 2] [3 4] [5 6]] into [[1 3 5] [2 4 6]]. Makes as many
-passes as there are columns, causing a lazy sequence to be fully
-realized after the first pass."
-  [rows]
-  (let [n-col (count (first rows))]
-    (vec (for [i (range n-col)]
-           (vec (map #(nth % i) rows))))))
+  "For sequences of sequences, convert rows to columns and vice versa."
+  [vs]
+  (if vs
+    (loop [remaining-vs vs
+           transformed (repeatedly (count (first vs))
+                                   #(transient []))]
+      (if (first remaining-vs)
+        (recur (next remaining-vs)
+               (map conj!
+                    transformed
+                    (first remaining-vs)))
+        (mapv persistent! transformed)))
+    nil))
 
 (defn equal-length
   "For one or more vectors, determine if all vectors have the same length."
